@@ -1,0 +1,1813 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FAF9F6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="日记">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>日常书</title>
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+  import { getAnalytics } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js';
+  import { getFirestore, collection, addDoc, getDocs, doc, getDoc, updateDoc, query, orderBy, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+  import { getStorage, ref, uploadBytes, getDownloadURL, listAll, deleteObject } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyC6b3MyCsbqnWPSIg1VoJTovCTg9Fg3pts",
+    authDomain: "daily-diary-de4a0.firebaseapp.com",
+    projectId: "daily-diary-de4a0",
+    storageBucket: "daily-diary-de4a0.firebasestorage.app",
+    messagingSenderId: "835939552205",
+    appId: "1:835939552205:web:93af42f18428918a051284",
+    measurementId: "G-RG0DJP5ZWX"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
+
+  // 将Firebase函数暴露到全局，供普通script使用
+  window.firebaseApp = {
+    db,
+    storage,
+    collection,
+    addDoc,
+    getDocs,
+    doc,
+    getDoc,
+    updateDoc,
+    query,
+    where,
+    ref,
+    uploadBytes,
+    getDownloadURL
+  };
+</script>
+    <style>
+  @font-face {
+    font-family: 'HuiwenMincho';
+    src: url('HuiwenMincho.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    unicode-range: U+4E00-9FFF, U+3400-4DBF; /* 中文字符 */
+  }
+
+  @font-face {
+    font-family: 'SpecialElite';
+    src: url('SpecialElite.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    unicode-range: U+0000-007F, U+0030-0039; /* 英文和数字 */
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text-primary);
+    overflow-x: hidden;
+  }
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  /* iOS安全区域适配 */
+  .safe-area-top { padding-top: max(10px, env(safe-area-inset-top)); }
+  .safe-area-bottom { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+  
+  /* 全局字体设置：英文和数字用 Courier，中文用汇文明朝体 */
+  html, body, button, input, textarea, h1, h2, h3, h4, h5, h6, p, span, div, a {
+    font-family: 'Courier', 'HuiwenMincho', serif !important;
+  }
+
+  :root {
+    --mood-happy: #FFD166;
+    --mood-calm: #06D6A0;
+    --mood-tired: #F4A261;
+    --mood-sad: #118AB2;
+    --mood-angry: #EF476F;
+    --bg: #F8F7F4;
+    --card-bg: #FFFFFF;
+    --text-primary: #1A1A1A;
+    --text-secondary: #888;
+    --border: #EBEBEB;
+    --radius: 12px;
+  }
+
+  body {
+    font-family: 'HuiwenMincho', 'SpecialElite', serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    max-width: 390px;
+    margin: 0 auto;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* ===== 通用 ===== */
+  .page {
+    display: none;
+    flex-direction: column;
+    min-height: 100vh;
+    background: var(--bg);
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    animation: slideIn 0.28s ease;
+  }
+  .page.active { display: flex; }
+  @keyframes slideIn { from { transform: translateX(6%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes slideInLeft { from { transform: translateX(-6%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  .nav-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: max(52px, calc(10px + env(safe-area-inset-top))) 20px 12px;
+    background: var(--bg);
+  }
+  .nav-title { font-size: 17px; font-weight: 600; }
+  .nav-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: none; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; color: var(--text-primary);
+    transition: background-color 0.15s;
+  }
+  .nav-btn:active { background: var(--border); transform: scale(0.95); }
+
+  /* ===== 首页月历 ===== */
+  #page-home { background: var(--bg); }
+
+  .month-header {
+    text-align: center;
+    padding: 10px 20px 0;
+    position: relative;
+  }
+  .month-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px;
+  }
+  .month-name {
+    font-size: 20px; font-weight: 500; letter-spacing: -0.5px;
+    cursor: pointer;
+    font-family: 'Courier', 'HuiwenMincho', serif !important;
+  }
+  .month-year {
+    font-size: 14px; color: var(--text-secondary);
+    margin-top: 2px;
+    cursor: pointer;
+  }
+  .month-year:hover { color: var(--text-primary); }
+  .month-center { text-align: center; flex: 1; }
+  .view-toggle {
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 16px;
+  }
+  .view-toggle:active { opacity: 0.6; }
+
+  .calendar-wrap {
+    padding: 12px 16px 0;
+    touch-action: pan-y;
+    user-select: none;
+  }
+  .weekdays {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    margin-bottom: 4px;
+  }
+  .weekday {
+    text-align: center; font-size: 12px; color: var(--text-secondary);
+    padding: 4px 0; font-weight: 400;
+  }
+  .days-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+  }
+  .day-cell {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    background: transparent;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+    transition: transform 0.12s;
+  }
+  .day-cell:active { transform: scale(0.94); }
+  .day-cell.empty { background: transparent; cursor: default; }
+  .day-cell.today .day-num { font-weight: 700; }
+  .day-cell.selected { border: 2px solid rgba(26, 26, 26, 0.8); }
+  .day-cell.future { opacity: 0.35; cursor: default; }
+
+  .day-num {
+    font-size: 12px; font-weight: 400; color: var(--text-primary);
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 3;
+    line-height: 1;
+    font-family: 'Courier', 'HuiwenMincho', serif !important;
+  }
+  .day-cell.has-entry .day-num { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+
+  /* 心情模式 */
+  .day-cell.mood-cell .mood-img {
+    width: 60%; height: 60%; object-fit: contain;
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0.5;
+    z-index: 1;
+  }
+
+  /* 图片模式 */
+  .day-cell .thumb-img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%; object-fit: cover;
+    z-index: 1;
+  }
+  .day-cell .thumb-img + .day-num { z-index: 2; }
+  
+  /* 只有文字没有图片 */
+  .day-cell.text-only {
+    background: #E8DFD4;
+  }
+  .day-cell.text-only .day-num {
+    color: #1A1A1A;
+    text-shadow: none;
+  }
+
+  /* 当月记录列表 */
+  .entries-list {
+    flex: 1;
+    padding: 16px 16px 100px;
+    overflow-y: auto;
+  }
+  .entries-title {
+    font-size: 13px; color: var(--text-secondary);
+    margin-bottom: 12px; font-weight: 400;
+  }
+  .entry-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    display: flex; gap: 12px; align-items: center;
+    transition: transform 0.12s, background-color 0.15s;
+  }
+  .entry-card:active { transform: scale(0.98); background-color: var(--border); }
+  .entry-date-col { min-width: 50px; text-align: center; }
+  .entry-day-num { font-size: 18px; font-weight: 700; line-height: 1; font-family: 'Courier', 'HuiwenMincho', serif !important; }
+  .entry-weekday { font-size: 8px; color: var(--text-secondary); margin-top: 2px; font-family: 'Courier', 'HuiwenMincho', serif !important; }
+  .entry-thumbs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .entry-thumb {
+    width: 72px; height: 72px; border-radius: 8px;
+    background: var(--border); object-fit: cover; flex-shrink: 0;
+    display: block;
+  }
+  .entry-text {
+    font-size: 13px; color: var(--text-secondary);
+    margin-top: 8px; line-height: 1.6;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .entry-body { flex: 1; display: flex; flex-direction: column; }
+  .entry-mood-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; padding: 2px 8px; border-radius: 20px;
+    margin-bottom: 6px;
+  }
+
+  /* FAB */
+  .fab {
+    position: fixed; bottom: max(36px, calc(26px + env(safe-area-inset-bottom))); left: 50%; transform: translateX(-50%);
+    width: 56px; height: 56px; border-radius: 50%;
+    background: #1A1A1A; color: #fff;
+    font-size: 28px; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.22);
+    z-index: 100;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .fab:active { transform: translateX(-50%) scale(0.92); box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+
+  /* ===== 年度视图 ===== */
+  #page-year { background: var(--bg); }
+  .year-toggle-bar {
+    display: flex; gap: 8px; padding: 0 20px 16px;
+  }
+  .year-toggle-btn {
+    flex: 1; padding: 8px; border-radius: 20px;
+    border: 1.5px solid var(--border); background: none;
+    font-size: 13px; cursor: pointer; font-family: inherit;
+    transition: all 0.15s;
+  }
+  .year-toggle-btn.active {
+    background: #1A1A1A; color: #fff; border-color: #1A1A1A;
+  }
+  .year-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 12px; padding: 0 16px 40px;
+  }
+  .mini-month { background: var(--card-bg); border-radius: 10px; padding: 8px; }
+  .mini-month-name { font-size: 9px; font-weight: 700; margin-bottom: 6px; text-align: center; font-family: 'Courier', 'HuiwenMincho', serif !important; }
+  .mini-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1.5px; }
+  .mini-day {
+    aspect-ratio: 1; border-radius: 2px;
+    background: var(--border);
+  }
+  .mini-day.has-photo { background: #E8DFD4; }
+  .mini-day.no-photo { background: var(--border); opacity: 0.4; }
+  .mini-day.mood-happy { background: var(--mood-happy); }
+  .mini-day.mood-calm { background: var(--mood-calm); }
+  .mini-day.mood-tired { background: var(--mood-tired); }
+  .mini-day.mood-sad { background: var(--mood-sad); }
+  .mini-day.mood-angry { background: var(--mood-angry); }
+  .mini-day.empty-day { background: transparent; }
+
+  /* ===== 新建记录 ===== */
+  #page-new { background: var(--bg); }
+  .new-content { flex: 1; padding: 0 20px; overflow-y: auto; }
+  .new-textarea {
+    width: 100%; min-height: 160px;
+    border: none; background: none; resize: none;
+    font-size: 16px; line-height: 1.7; font-family: inherit;
+    color: var(--text-primary); outline: none;
+    padding: 12px 0;
+  }
+  .new-textarea::placeholder { color: #C0BDB8; }
+
+  .mood-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 0;
+    border-top: 1px solid var(--border);
+    position: relative;
+  }
+  .mood-current {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: 1.5px solid var(--border); background: var(--card-bg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; cursor: pointer;
+  }
+  .mood-label { font-size: 14px; color: var(--text-secondary); flex: 1; }
+  .mood-picker {
+    position: absolute; bottom: 54px; left: 0; right: 0;
+    background: var(--card-bg);
+    border-radius: 16px 16px 0 0;
+    padding: 16px 20px 20px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+    display: none; z-index: 50;
+  }
+  .mood-picker.open { display: block; }
+  .mood-picker-title { font-size: 11px; color: var(--text-secondary); margin-bottom: 14px; }
+  .mood-options { display: flex; gap: 16px; justify-content: center; }
+  .mood-option {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    cursor: pointer; padding: 8px 10px; border-radius: 10px;
+    transition: background 0.12s;
+  }
+  .mood-option:active { background: var(--border); }
+  .mood-option.selected { background: var(--border); }
+  .mood-emoji {
+    width: 28px; height: 28px; object-fit: contain;
+  }
+  .mood-name { font-size: 11px; color: var(--text-secondary); }
+  .mood-dot-sm {
+    width: 10px; height: 10px; border-radius: 50%;
+    margin: 0 auto 2px;
+  }
+
+  .photos-row {
+    padding: 12px 0;
+    border-top: 1px solid var(--border);
+  }
+  .photos-scroll { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+  .photos-scroll::-webkit-scrollbar { display: none; }
+  .photo-item {
+    width: 80px; height: 80px; border-radius: 10px;
+    background: var(--border); flex-shrink: 0;
+    object-fit: cover; position: relative;
+  }
+  .photo-add {
+    width: 80px; height: 80px; border-radius: 10px;
+    border: 1.5px dashed #C0BDB8; background: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; color: #C0BDB8; cursor: pointer; flex-shrink: 0;
+  }
+  .photo-add:active { background: var(--border); }
+  .photo-wrapper { position: relative; flex-shrink: 0; }
+  .photo-del {
+    position: absolute; top: -6px; right: -6px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #1A1A1A; color: #fff;
+    border: none; font-size: 12px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 5;
+  }
+
+  .new-date-label {
+    font-size: 13px; color: var(--text-secondary);
+    padding: 8px 0 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ===== 详情页 ===== */
+  #page-detail { background: var(--bg); }
+  .detail-photos {
+    padding: 0 20px;
+    display: flex; gap: 8px; overflow-x: auto;
+  }
+  .detail-photos::-webkit-scrollbar { display: none; }
+  .detail-photo {
+    width: 200px; height: 200px; border-radius: 12px;
+    background: var(--border); object-fit: cover; flex-shrink: 0;
+    display: block;
+  }
+  .detail-body { padding: 20px; flex: 1; }
+  .detail-mood-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 20px;
+    font-size: 11px; margin-bottom: 16px;
+  }
+  .detail-date { font-size: 18px; font-weight: 700; margin-bottom: 4px; font-family: 'Courier', 'HuiwenMincho', serif !important; }
+  .detail-weekday { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; }
+  .detail-text { font-size: 16px; line-height: 1.8; color: var(--text-primary); white-space: pre-wrap; }
+
+  /* ===== 设置页 ===== */
+  #page-settings { background: var(--bg); }
+  .settings-profile {
+    display: flex; align-items: center; gap: 14px;
+    padding: 20px; background: var(--card-bg);
+    margin: 0 16px 16px; border-radius: var(--radius);
+    cursor: pointer;
+  }
+  .avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--border); display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .profile-info { flex: 1; }
+  .profile-name { font-size: 16px; font-weight: 600; }
+  .profile-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .settings-section {
+    background: var(--card-bg); margin: 0 16px 12px;
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .settings-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; cursor: pointer;
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-row:active { background: var(--bg); }
+  .settings-row-label { font-size: 13px; }
+  .settings-row-right { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 12px; }
+  .settings-arrow { color: #C0BDB8; font-size: 12px; }
+
+  /* toggle switch */
+  .toggle {
+    width: 44px; height: 26px; border-radius: 13px;
+    background: var(--border); position: relative; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle.on { background: #34C759; }
+  .toggle-knob {
+    width: 22px; height: 22px; border-radius: 50%; background: #fff;
+    position: absolute; top: 2px; left: 2px;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  }
+  .toggle.on .toggle-knob { transform: translateX(18px); }
+
+  .settings-footer {
+    text-align: center; padding: 20px;
+    font-size: 13px; color: var(--text-secondary);
+  }
+
+  /* ===== 导出弹窗 ===== */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 200; display: none; align-items: flex-end;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-sheet {
+    width: 100%; background: var(--card-bg);
+    border-radius: 20px 20px 0 0;
+    padding: 20px 20px 40px;
+    animation: sheetUp 0.25s ease;
+  }
+  @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+  .modal-sub { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; }
+  .export-option {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 0; border-bottom: 1px solid var(--border); cursor: pointer;
+  }
+  .export-option:last-child { border-bottom: none; }
+  .export-icon { font-size: 22px; width: 36px; text-align: center; }
+  .export-info { flex: 1; }
+  .export-name { font-size: 13px; font-weight: 400; }
+  .export-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* ===== 同步页 ===== */
+  #page-sync { background: var(--bg); }
+  .sync-section { background: var(--card-bg); margin: 0 16px 12px; border-radius: var(--radius); overflow: hidden; }
+
+  /* ===== toast ===== */
+  .toast {
+    position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.75); color: #fff;
+    padding: 10px 20px; border-radius: 20px; font-size: 14px;
+    z-index: 500; opacity: 0; transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  /* JPG 导出按钮 */
+  .export-mode-btn {
+    flex: 1; padding: 10px 16px; border-radius: 20px;
+    border: 1.5px solid var(--border); background: none;
+    font-size: 13px; cursor: pointer; font-family: inherit;
+    transition: all 0.15s;
+  }
+  .export-mode-btn.active {
+    background: #1A1A1A; color: #fff; border-color: #1A1A1A;
+  }
+  .export-month-btn {
+    padding: 10px; border-radius: 12px;
+    border: 1.5px solid var(--border); background: none;
+    font-size: 12px; cursor: pointer; font-family: inherit;
+    transition: all 0.15s;
+  }
+  .export-month-btn.active {
+    background: #1A1A1A; color: #fff; border-color: #1A1A1A;
+  }
+  .export-confirm-btn {
+    width: 100%; padding: 14px; border-radius: 12px;
+    border: none; background: #1A1A1A; color: #fff;
+    font-size: 15px; font-weight: 600; cursor: pointer;
+    font-family: inherit;
+  }
+  .export-confirm-btn:active { opacity: 0.8; }
+
+  /* ===== App 底部名称 ===== */
+  .app-name-bar {
+    text-align: center; padding: 8px;
+    font-size: 10px; color: var(--text-secondary);
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== 首页 ==================== -->
+<div id="page-home" class="page active">
+  <div style="padding: 52px 20px 0; display:flex; justify-content:space-between; align-items:center;">
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="nav-btn" onclick="goTo('page-year')" title="年度视图">
+        <!-- 小格子图标 -->
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2" width="6" height="6" rx="1"/>
+          <rect x="12" y="2" width="6" height="6" rx="1"/>
+          <rect x="2" y="12" width="6" height="6" rx="1"/>
+          <rect x="12" y="12" width="6" height="6" rx="1"/>
+        </svg>
+      </button>
+      <div class="view-toggle" id="view-toggle-btn" onclick="toggleCalView()" title="切换心情/图片缩略图"></div>
+    </div>
+    <div style="text-align:center; flex:1;">
+      <div class="month-name" id="home-month-name" onclick="goTo('page-year')">April</div>
+      <div class="month-year" id="home-month-year" onclick="goTo('page-year')">2026</div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="nav-btn" onclick="openJPGExportSheet()" title="导出月历">
+        <!-- 下载图标 -->
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 13V3M10 13l4-4M10 13l-4-4"/>
+          <path d="M3 17h14"/>
+        </svg>
+      </button>
+      <button class="nav-btn" onclick="goTo('page-settings')">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="10" cy="10" r="3"/>
+          <path d="M10 5V3M10 17v-2M15.66 15.66l-1.42-1.42M5.76 5.76l1.42 1.42M17 10h-2M5 10H3"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- 月历 -->
+  <div class="calendar-wrap" id="calendar-wrap">
+    <div class="weekdays" id="weekdays-row"></div>
+    <div class="days-grid" id="days-grid"></div>
+  </div>
+
+  <!-- 当月记录列表 -->
+  <div class="entries-list" id="entries-list">
+    <div class="entries-title">本月记录</div>
+    <div id="entries-container"></div>
+    <div id="entries-empty" style="text-align:center; padding:40px 0; color:var(--text-secondary); font-size:14px; display:none;">
+      还没有记录，点击 + 开始今天
+    </div>
+  </div>
+
+  <!-- 新建按钮 -->
+  <button class="fab" onclick="openNew()">+</button>
+</div>
+
+<!-- ==================== 年度视图 ==================== -->
+<div id="page-year" class="page">
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="goBack()">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 5l-6 5 6 5"/>
+      </svg>
+    </button>
+    <div>
+      <div class="nav-title" id="year-title" onclick="showYearPicker()" style="cursor:pointer;" title="点击切换年份">2026</div>
+      <div id="year-count" style="font-size:12px; color:var(--text-secondary); text-align:center; margin-top:2px;">0 条记录</div>
+    </div>
+    <div style="width:36px;"></div>
+  </div>
+  <div class="year-toggle-bar">
+    <button class="year-toggle-btn" id="year-btn-photo" onclick="setYearMode('photo')">图片画廊</button>
+    <button class="year-toggle-btn active" id="year-btn-mood" onclick="setYearMode('mood')">心情彩虹</button>
+  </div>
+  <div class="year-grid" id="year-grid" onwheel="handleYearWheel(event)"></div>
+</div>
+
+<!-- ==================== 新建/编辑记录 ==================== -->
+<div id="page-new" class="page">
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="goBack()">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 5l-6 5 6 5"/>
+      </svg>
+    </button>
+    <div class="nav-title" id="new-page-title">新建</div>
+    <button class="nav-btn" onclick="saveEntry()">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12l3 3 7-7"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="new-content">
+    <div class="new-date-label" id="new-date-label"></div>
+
+    <!-- 文字输入 -->
+    <textarea class="new-textarea" id="new-textarea" placeholder="今天过得怎么样？"></textarea>
+
+    <!-- 心情选择 -->
+    <div class="mood-row">
+      <div class="mood-current" id="mood-current-btn" onclick="toggleMoodPicker()">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="16" cy="16" r="12"/>
+          <circle cx="12" cy="12" r="1.5"/>
+          <circle cx="20" cy="12" r="1.5"/>
+          <path d="M10 20c2 3 6 3 8 0"/>
+        </svg>
+      </div>
+      <span class="mood-label" id="mood-label-text">选择心情</span>
+    </div>
+
+    <!-- 心情选择器 -->
+    <div class="mood-picker" id="mood-picker">
+      <div class="mood-picker-title">今天的心情</div>
+      <div class="mood-options">
+        <div class="mood-option" onclick="selectMood('happy')" id="mood-opt-happy">
+          <div class="mood-dot-sm" style="background:var(--mood-happy)"></div>
+          <img class="mood-emoji" src="mood_happy.png" alt="开心">
+          <span class="mood-name">开心</span>
+        </div>
+        <div class="mood-option" onclick="selectMood('calm')" id="mood-opt-calm">
+          <div class="mood-dot-sm" style="background:var(--mood-calm)"></div>
+          <img class="mood-emoji" src="mood_calm.png" alt="平静">
+          <span class="mood-name">平静</span>
+        </div>
+        <div class="mood-option" onclick="selectMood('tired')" id="mood-opt-tired">
+          <div class="mood-dot-sm" style="background:var(--mood-tired)"></div>
+          <img class="mood-emoji" src="mood_tired.png" alt="疲惫">
+          <span class="mood-name">疲惫</span>
+        </div>
+        <div class="mood-option" onclick="selectMood('sad')" id="mood-opt-sad">
+          <div class="mood-dot-sm" style="background:var(--mood-sad)"></div>
+          <img class="mood-emoji" src="mood_sad.png" alt="难过">
+          <span class="mood-name">难过</span>
+        </div>
+        <div class="mood-option" onclick="selectMood('angry')" id="mood-opt-angry">
+          <div class="mood-dot-sm" style="background:var(--mood-angry)"></div>
+          <img class="mood-emoji" src="mood_angry.png" alt="愤怒">
+          <span class="mood-name">愤怒</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图片上传 -->
+    <div class="photos-row">
+      <div class="photos-scroll" id="photos-scroll">
+        <button class="photo-add" onclick="addPhoto()">+</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 详情页 ==================== -->
+<div id="page-detail" class="page">
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="goBack()">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 5l-6 5 6 5"/>
+      </svg>
+    </button>
+    <div class="nav-title" id="detail-title-date"></div>
+    <button class="nav-btn" onclick="editCurrentEntry()">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 17l4-4M7 3v10h10"/>
+        <path d="M10 7l4-4 3 3-4 4"/>
+      </svg>
+    </button>
+  </div>
+  <div style="overflow-y:auto; flex:1;">
+    <div class="detail-photos" id="detail-photos"></div>
+    <div class="detail-body">
+      <div class="detail-date" id="detail-date"></div>
+      <div class="detail-weekday" id="detail-weekday"></div>
+      <div class="detail-mood-chip" id="detail-mood-chip"></div>
+      <div class="detail-text" id="detail-text"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 设置页 ==================== -->
+<div id="page-settings" class="page">
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="goBack()">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 5l-6 5 6 5"/>
+      </svg>
+    </button>
+    <div class="nav-title">我的</div>
+    <div style="width:36px;"></div>
+  </div>
+
+  <div style="overflow-y:auto; flex:1; padding-bottom:40px;">
+    <!-- 头像 -->
+    <div class="settings-profile">
+      <div class="avatar">🙂</div>
+      <div class="profile-info">
+        <div class="profile-name">昵称</div>
+        <div class="profile-sub">账号/ID/个人资料</div>
+      </div>
+      <span class="settings-arrow">›</span>
+    </div>
+
+    <!-- 偏好 -->
+    <div class="settings-section">
+      <div class="settings-row" onclick="showToast('主题设置开发中')">
+        <span class="settings-row-label">主题</span>
+        <div class="settings-row-right">浅色 <span class="settings-arrow">›</span></div>
+      </div>
+      <div class="settings-row" onclick="showToast('每周起始日设置开发中')">
+        <span class="settings-row-label">每周起始日</span>
+        <div class="settings-row-right">周一 <span class="settings-arrow">›</span></div>
+      </div>
+    </div>
+
+    <!-- 数据 -->
+    <div class="settings-section">
+      <div class="settings-row" onclick="openExportSheet()">
+        <span class="settings-row-label">导出</span>
+        <div class="settings-row-right"><span class="settings-arrow">›</span></div>
+      </div>
+      <div class="settings-row" onclick="goTo('page-sync')">
+        <span class="settings-row-label">同步</span>
+        <div class="settings-row-right"><span class="settings-arrow">›</span></div>
+      </div>
+    </div>
+
+    <!-- 关于 -->
+    <div class="settings-section">
+      <div class="settings-row" onclick="showToast('服务条款')">
+        <span class="settings-row-label">服务条款</span>
+        <div class="settings-row-right"><span class="settings-arrow">›</span></div>
+      </div>
+      <div class="settings-row" onclick="showToast('隐私政策')">
+        <span class="settings-row-label">隐私政策</span>
+        <div class="settings-row-right"><span class="settings-arrow">›</span></div>
+      </div>
+      <div class="settings-row" onclick="showToast('联系我们')">
+        <span class="settings-row-label">联系我们</span>
+        <div class="settings-row-right"><span class="settings-arrow">›</span></div>
+      </div>
+      <div class="settings-row" onclick="showToast('小红书')">
+        <span class="settings-row-label">小红书</span>
+        <div class="settings-row-right"><span class="settings-arrow">›</span></div>
+      </div>
+    </div>
+
+    <div class="settings-footer">日常书</div>
+  </div>
+</div>
+
+<!-- ==================== 同步页 ==================== -->
+<div id="page-sync" class="page">
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="goBack()">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 5l-6 5 6 5"/>
+      </svg>
+    </button>
+    <div class="nav-title">同步</div>
+    <div style="width:36px;"></div>
+  </div>
+  <div class="sync-section">
+    <div class="settings-row">
+      <span class="settings-row-label">云同步</span>
+      <div class="toggle" id="toggle-cloud" onclick="toggleSwitch('cloud')">
+        <div class="toggle-knob"></div>
+      </div>
+    </div>
+    <div class="settings-row">
+      <span class="settings-row-label">自动同步</span>
+      <div class="toggle on" id="toggle-auto" onclick="toggleSwitch('auto')">
+        <div class="toggle-knob"></div>
+      </div>
+    </div>
+    <div class="settings-row" onclick="showToast('本地备份已完成')">
+      <span class="settings-row-label">本地备份</span>
+      <div class="settings-row-right"><span class="settings-arrow">›</span></div>
+    </div>
+  </div>
+  <div style="padding: 16px 20px; font-size:13px; color:var(--text-secondary); line-height:1.6;">
+    开启云同步后，日记数据将加密存储至云端，可在多设备间访问。未登录时仅本地保存。
+  </div>
+</div>
+
+<!-- ==================== 导出弹窗 ==================== -->
+<div class="modal-overlay" id="export-modal" onclick="closeExportSheet(event)">
+  <div class="modal-sheet">
+    <div class="modal-title">导出</div>
+    <div class="modal-sub">选择导出格式</div>
+    <div class="export-option" onclick="showToast('TXT 导出功能开发中')">
+      <div class="export-icon">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 4h20v24H6zM10 8h12M10 14h12M10 20h8"/>
+        </svg>
+      </div>
+      <div class="export-info">
+        <div class="export-name">导出 TXT</div>
+        <div class="export-desc">纯文本，可选择日期范围</div>
+      </div>
+    </div>
+    <div class="export-option" onclick="openJPGExportSheet()">
+      <div class="export-icon">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="4" width="24" height="24" rx="1"/>
+          <circle cx="12" cy="14" r="2"/>
+          <circle cx="20" cy="14" r="2"/>
+          <path d="M4 24h24"/>
+        </svg>
+      </div>
+      <div class="export-info">
+        <div class="export-name">导出 JPG</div>
+        <div class="export-desc">每月月历一张图片</div>
+      </div>
+    </div>
+    <div class="export-option" onclick="showToast('PDF 导出功能开发中')">
+      <div class="export-icon">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 4h20l-2 24H4L6 4zM10 4V2h12v2M10 16h12"/>
+        </svg>
+      </div>
+      <div class="export-info">
+        <div class="export-name">导出 PDF</div>
+        <div class="export-desc">排版精美，可选择日期范围</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== JPG 导出选择弹窗 ==================== -->
+<div class="modal-overlay" id="jpg-export-modal" onclick="closeJPGExportSheet(event)">
+  <div class="modal-sheet" style="max-height:80vh; overflow-y:auto;">
+    <div class="modal-title">导出 JPG 月历</div>
+    <div class="modal-sub">选择导出选项</div>
+
+    <div style="margin-bottom:20px;">
+      <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">显示模式</div>
+      <div style="display:flex; gap:10px;">
+        <button class="export-mode-btn active" id="jpg-mode-photo" onclick="setJPGExportMode('photo')">图片模式</button>
+        <button class="export-mode-btn" id="jpg-mode-mood" onclick="setJPGExportMode('mood')">心情模式</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom:20px;">
+      <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">选择月份（可多选）</div>
+      <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px;">
+        <button class="export-month-btn" onclick="setJPGExportMonth(0)">1月</button>
+        <button class="export-month-btn" onclick="setJPGExportMonth(1)">2月</button>
+        <button class="export-month-btn" onclick="setJPGExportMonth(2)">3月</button>
+        <button class="export-month-btn" onclick="setJPGExportMonth(3)">4月</button>
+        <button class="export-month-btn" onclick="setJPGExportMonth(4)">5月</button>
+        <button class="export-month-btn" onclick="setJPGExportMonth(5)">6月</button>
+        <button class="export-month-btn" onclick="setJPGExportMonth(6)">7月</button>
+        <button class="export-month-btn" onclick="setJPGExportMonth(7)">8月</button>
+        <button class="export-month-btn" onclick="setJPGExportMonth(8)">9月</button>
+        <button class="export-month-btn" onclick="setJPGExportMonth(9)">10月</button>
+        <button class="export-month-btn" onclick="setJPGExportMonth(10)">11月</button>
+        <button class="export-month-btn" onclick="setJPGExportMonth(11)">12月</button>
+      </div>
+    </div>
+
+    <div style="background:var(--bg); border-radius:12px; padding:16px; margin-bottom:20px;">
+      <div style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">预览</div>
+      <div id="jpg-preview-container" style="background:#fff; border-radius:8px; padding:16px; min-height:200px;"></div>
+    </div>
+
+    <button class="export-confirm-btn" onclick="confirmJPGExport()">确定导出</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== PWA Service Worker 注册 =====
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then((registration) => {
+        console.log('Service Worker 注册成功:', registration.scope);
+      })
+      .catch((error) => {
+        console.log('Service Worker 注册失败:', error);
+      });
+  });
+}
+
+// ===== 数据 =====
+const MOODS = {
+  happy:  { emoji:'😄', name:'开心', color:'var(--mood-happy)',  hex:'#FFD166' },
+  calm:   { emoji:'😌', name:'平静', color:'var(--mood-calm)',   hex:'#06D6A0' },
+  tired:  { emoji:'😩', name:'疲惫', color:'var(--mood-tired)',  hex:'#F4A261' },
+  sad:    { emoji:'😢', name:'难过', color:'var(--mood-sad)',    hex:'#118AB2' },
+  angry:  { emoji:'😡', name:'愤怒', color:'var(--mood-angry)',  hex:'#EF476F' },
+};
+
+// 模拟数据（使用真实图片）
+let entries = {
+  '2026-04-04': { mood:'calm', text:'天气不错，拍了几张照片。', photos: ['photo1.jpg','photo2.jpg','photo3.jpg','photo1.jpg','photo2.jpg'] },
+  '2026-04-03': { mood:'happy', text:'和朋友去了公园，很开心。我们玩了一整天，吃了很多好吃的食物，还拍了很多照片。', photos: ['photo3.jpg','photo1.jpg','photo2.jpg','photo3.jpg'] },
+  '2026-04-02': { mood:'tired', text:'工作太忙了，累了一天。但是完成了很重要的项目，心里还是挺有成就感的。明天要好好休息一下。', photos: ['photo1.jpg','photo2.jpg','photo3.jpg'] },
+  '2026-04-01': { mood:'tired', text:'工作太忙了，累了一天。', photos: [] },
+  '2026-03-28': { mood:'sad', text:'今天心情不太好。', photos: ['photo2.jpg','photo1.jpg'] },
+  '2026-03-15': { mood:'happy', text:'莫断穿林打叶声，何妨吟啸且徐行。', photos: ['photo3.jpg','photo1.jpg'] },
+  '2026-03-16': { mood:'calm', text:'天气好极了。饿几乎没有。', photos: ['photo2.jpg','photo3.jpg'] },
+};
+
+// ===== 状态 =====
+let currentYear = 2026;
+let currentMonth = 3; // 0-indexed (April = 3)
+let calView = 'photo'; // 'mood' | 'photo'
+let yearMode = 'photo'; // 'mood' | 'photo'
+let pageStack = ['page-home'];
+let editingDate = null;
+let newMood = null;
+let newPhotos = []; // 模拟图片（颜色数组）
+let selectedDate = null; // 选中的日期
+
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const CN_MONTH_NAMES = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+const WEEKDAYS_MON = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const CN_WEEKDAYS = ['周一','周二','周三','周四','周五','周六','周日'];
+const TODAY = new Date(2026, 3, 4); // 2026-04-04
+
+// ===== 页面切换 =====
+function goTo(pageId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(pageId).classList.add('active');
+  pageStack.push(pageId);
+  window.scrollTo(0, 0);
+}
+
+function goBack() {
+  pageStack.pop();
+  const prev = pageStack[pageStack.length - 1] || 'page-home';
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const el = document.getElementById(prev);
+  el.classList.add('active');
+  el.style.animation = 'slideInLeft 0.25s ease';
+  setTimeout(() => el.style.animation = '', 300);
+  if (prev === 'page-home') renderHome();
+}
+
+// ===== Toast =====
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ===== 切换 =====
+function toggleSwitch(key) {
+  const el = document.getElementById('toggle-' + key);
+  el.classList.toggle('on');
+  if (key === 'cloud' && el.classList.contains('on')) {
+    showToast('请先登录以使用云同步');
+    setTimeout(() => el.classList.remove('on'), 100);
+  }
+}
+
+// ===== 首页渲染 =====
+async function loadEntriesFromFirebase() {
+  try {
+    const { db, collection, getDocs } = window.firebaseApp;
+    const querySnapshot = await getDocs(collection(db, 'entries'));
+    entries = {};
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.date) {
+        entries[data.date] = {
+          mood: data.mood,
+          text: data.text,
+          photos: data.photos || []
+        };
+      }
+    });
+    renderHome();
+  } catch (error) {
+    console.error('加载数据失败:', error);
+    // 如果失败，使用模拟数据
+  }
+}
+
+function renderHome() {
+  document.getElementById('home-month-name').textContent = MONTH_NAMES[currentMonth];
+  document.getElementById('home-month-year').textContent = currentYear;
+  document.getElementById('year-title').textContent = currentYear;
+  renderCalendar();
+  renderEntriesList();
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('days-grid');
+  const weekRow = document.getElementById('weekdays-row');
+  grid.innerHTML = '';
+  weekRow.innerHTML = WEEKDAYS_MON.map(d => `<div class="weekday">${d}</div>`).join('');
+
+  const year = currentYear, month = currentMonth;
+  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const offset = firstDay === 0 ? 6 : firstDay - 1; // Mon-first
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // 空白
+  for (let i = 0; i < offset; i++) {
+    const c = document.createElement('div');
+    c.className = 'day-cell empty';
+    grid.appendChild(c);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const entry = entries[dateStr];
+    const cellDate = new Date(year, month, d);
+    const isToday = cellDate.toDateString() === TODAY.toDateString();
+    const isFuture = cellDate > TODAY;
+
+    const cell = document.createElement('div');
+    cell.className = 'day-cell' + (isToday ? ' today' : '') + (isFuture ? ' future' : '') + (entry ? ' has-entry' : '');
+    cell.dataset.date = dateStr;
+
+    const num = document.createElement('span');
+    num.className = 'day-num';
+    num.textContent = d;
+    cell.appendChild(num);
+
+    if (entry && !isFuture) {
+      if (calView === 'mood') {
+        // 心情模式：显示心情图片
+        if (entry.mood) {
+          cell.classList.add('mood-cell');
+          const moodImgMap = { happy: 'mood_happy.png', calm: 'mood_calm.png', tired: 'mood_tired.png', sad: 'mood_sad.png', angry: 'mood_angry.png' };
+          const img = document.createElement('img');
+          img.className = 'mood-img';
+          img.src = moodImgMap[entry.mood] || 'mood_happy.png';
+          cell.appendChild(img);
+        }
+      } else {
+        // 图片模式：显示图片缩略图或文字指示
+        if (entry.photos && entry.photos.length > 0) {
+          const img = document.createElement('img');
+          img.className = 'thumb-img';
+          img.src = entry.photos[0];
+          cell.appendChild(img);
+        } else if (entry.text) {
+          // 只有文字没有图片，显示米色背景
+          cell.classList.add('text-only');
+        }
+      }
+    }
+
+    if (!isFuture) {
+      cell.onclick = () => selectDate(dateStr, d);
+    }
+    grid.appendChild(cell);
+  }
+}
+
+// ===== 选中日期 =====
+function selectDate(dateStr, day) {
+  selectedDate = dateStr;
+  // 更新格子选中状态
+  document.querySelectorAll('.day-cell').forEach(c => c.classList.remove('selected'));
+  const targetCell = document.querySelector(`.day-cell[data-date="${dateStr}"]`);
+  if (targetCell) targetCell.classList.add('selected');
+  // 滚动到列表中对应日期的卡片
+  const targetCard = document.querySelector(`.entry-card[data-date="${dateStr}"]`);
+  if (targetCard) {
+    targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function renderEntriesList() {
+  const container = document.getElementById('entries-container');
+  const empty = document.getElementById('entries-empty');
+  container.innerHTML = '';
+
+  const year = currentYear, month = currentMonth;
+  const monthEntries = Object.entries(entries)
+    .filter(([k]) => {
+      const [y, m] = k.split('-').map(Number);
+      return y === year && m === month + 1;
+    })
+    .sort(([a], [b]) => b.localeCompare(a));
+
+  if (monthEntries.length === 0) {
+    empty.style.display = 'block'; return;
+  }
+  empty.style.display = 'none';
+
+  const weekDayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  monthEntries.forEach(([dateStr, entry]) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    const wd = weekDayNames[dt.getDay()];
+    const mood = MOODS[entry.mood];
+
+    const card = document.createElement('div');
+    card.className = 'entry-card';
+    card.setAttribute('data-date', dateStr);
+    card.onclick = () => openDetail(dateStr);
+
+    const thumbsHTML = (entry.photos || []).slice(0,3).map(p =>
+      `<img class="entry-thumb" src="${p}">`
+    ).join('');
+
+    card.innerHTML = `
+      <div class="entry-date-col">
+        <div class="entry-day-num">${String(d).padStart(2,'0')}</div>
+        <div class="entry-weekday">${MONTH_NAMES[m-1]}/${wd}</div>
+        ${mood ? `<img src="${{ happy: 'mood_happy.png', calm: 'mood_calm.png', tired: 'mood_tired.png', sad: 'mood_sad.png', angry: 'mood_angry.png' }[entry.mood]}" style="width:20px;height:20px;margin-top:10px;">` : ''}
+      </div>
+      <div class="entry-body">
+        ${thumbsHTML ? `<div class="entry-thumbs">${thumbsHTML}</div>` : ''}
+        ${entry.text ? `<div class="entry-text">${entry.text}</div>` : ''}
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+// ===== 月历切换心情/图片 =====
+function toggleCalView() {
+  calView = calView === 'mood' ? 'photo' : 'mood';
+  toggleCalViewIcon();
+  renderCalendar();
+}
+
+function toggleCalViewIcon() {
+  const btn = document.getElementById('view-toggle-btn');
+  if (calView === 'mood') {
+    btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="10" cy="10" r="8"/>
+      <circle cx="7" cy="8" r="1.5"/>
+      <circle cx="13" cy="8" r="1.5"/>
+      <path d="M6 14c2 2.5 6 2.5 8 0"/>
+    </svg>`;
+  } else {
+    btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="14" height="14" rx="1"/>
+      <circle cx="7" cy="8" r="1.5"/>
+      <circle cx="13" cy="8" r="1.5"/>
+      <path d="M3 14h14"/>
+    </svg>`;
+  }
+}
+
+// ===== 月历左右滑动 =====
+let touchStartX = 0;
+document.getElementById('calendar-wrap').addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
+});
+document.getElementById('calendar-wrap').addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  if (Math.abs(dx) > 50) {
+    if (dx < 0) nextMonth(); else prevMonth();
+  }
+});
+// 也支持鼠标拖拽（桌面预览）
+document.getElementById('calendar-wrap').addEventListener('mousedown', e => { touchStartX = e.clientX; });
+document.getElementById('calendar-wrap').addEventListener('mouseup', e => {
+  const dx = e.clientX - touchStartX;
+  if (Math.abs(dx) > 50) {
+    if (dx < 0) nextMonth(); else prevMonth();
+  }
+});
+
+function nextMonth() {
+  currentMonth++;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  renderHome();
+}
+function prevMonth() {
+  currentMonth--;
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  renderHome();
+}
+
+// ===== 打开记录 =====
+function openEntryOrNew(dateStr, day) {
+  if (entries[dateStr]) {
+    openDetail(dateStr);
+  } else {
+    openNew(dateStr);
+  }
+}
+
+// ===== 年度视图 =====
+function renderYear() {
+  const grid = document.getElementById('year-grid');
+  grid.innerHTML = '';
+  const year = currentYear;
+
+  // 统计当年记录数量
+  let yearEntryCount = 0;
+  Object.keys(entries).forEach(dateStr => {
+    const [y] = dateStr.split('-').map(Number);
+    if (y === year) {
+      yearEntryCount++;
+    }
+  });
+  document.getElementById('year-count').textContent = `${yearEntryCount} 条记录`;
+
+  for (let m = 0; m < 12; m++) {
+    const daysInMonth = new Date(year, m + 1, 0).getDate();
+    const firstDay = new Date(year, m, 1).getDay();
+    const offset = firstDay === 0 ? 6 : firstDay - 1;
+
+    const block = document.createElement('div');
+    block.className = 'mini-month';
+    block.onclick = () => { currentMonth = m; goBack(); renderHome(); };
+
+    const title = document.createElement('div');
+    title.className = 'mini-month-name';
+    title.textContent = MONTH_NAMES[m];
+    block.appendChild(title);
+
+    const days = document.createElement('div');
+    days.className = 'mini-days';
+
+    for (let i = 0; i < offset; i++) {
+      const c = document.createElement('div');
+      c.className = 'mini-day empty-day';
+      days.appendChild(c);
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const entry = entries[dateStr];
+      const cellDate = new Date(year, m, d);
+      const isFuture = cellDate > TODAY;
+
+      const c = document.createElement('div');
+      if (isFuture) {
+        c.className = 'mini-day empty-day';
+      } else if (yearMode === 'mood') {
+        c.className = entry ? `mini-day mood-${entry.mood}` : 'mini-day';
+        if (!entry) c.style.background = 'var(--border)';
+      } else {
+        // 图片有无
+        c.className = entry && entry.photos && entry.photos.length > 0 ? 'mini-day has-photo' : 'mini-day no-photo';
+      }
+      days.appendChild(c);
+    }
+
+    block.appendChild(days);
+    grid.appendChild(block);
+  }
+}
+
+function setYearMode(mode) {
+  yearMode = mode;
+  document.getElementById('year-btn-mood').classList.toggle('active', mode === 'mood');
+  document.getElementById('year-btn-photo').classList.toggle('active', mode === 'photo');
+  renderYear();
+}
+
+function showYearPicker() {
+  const years = [];
+  const current = currentYear;
+  for (let i = current - 10; i <= current + 10; i++) {
+    years.push(i);
+  }
+
+  let html = '<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; max-height:300px; overflow-y:auto;">';
+  years.forEach(y => {
+    html += `<button style="padding:12px; border:1px solid var(--border); background:var(--bg); border-radius:8px; font-size:16px; font-family:'Courier','HuiwenMincho',serif; cursor:pointer;" onclick="selectYear(${y})">${y}</button>`;
+  });
+  html += '</div>';
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `<div class="modal-sheet"><div class="modal-title">选择年份</div>${html}</div>`;
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  document.body.appendChild(modal);
+}
+
+function selectYear(year) {
+  currentYear = year;
+  document.getElementById('year-title').textContent = year;
+  document.querySelector('.modal-overlay').remove();
+  renderYear();
+}
+
+function handleYearWheel(e) {
+  e.preventDefault();
+  if (e.deltaY > 0) {
+    // 向下滚动，下一年
+    currentYear++;
+  } else {
+    // 向上滚动，上一年
+    currentYear--;
+  }
+  document.getElementById('year-title').textContent = currentYear;
+  renderYear();
+}
+
+// ===== 新建记录 =====
+function openNew(dateStr) {
+  editingDate = dateStr || formatDate(TODAY);
+  newMood = null;
+  newPhotos = [];
+  // 存储原始照片URL（用于检测是否被删除）
+  window._originalPhotos = [];
+
+  // 如果是编辑已有
+  const existing = entries[editingDate];
+  if (existing) {
+    document.getElementById('new-page-title').textContent = '编辑';
+    document.getElementById('new-textarea').value = existing.text || '';
+    newMood = existing.mood || null;
+    // 编辑模式下，只存储URL字符串（不上传到Storage的图片）
+    newPhotos = [...(existing.photos || [])];
+    window._originalPhotos = [...(existing.photos || [])];
+  } else {
+    document.getElementById('new-page-title').textContent = '新建';
+    document.getElementById('new-textarea').value = '';
+    newMood = null;
+    window._originalPhotos = [];
+  }
+
+  // 日期标签
+  const [y, m, d] = editingDate.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  const wds = ['日','一','二','三','四','五','六'];
+  document.getElementById('new-date-label').textContent = `${y}年${m}月${d}日 · 周${wds[dt.getDay()]}`;
+
+  updateMoodUI();
+  renderPhotoList();
+
+  document.getElementById('mood-picker').classList.remove('open');
+  goTo('page-new');
+}
+
+function formatDate(dt) {
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+
+function toggleMoodPicker() {
+  document.getElementById('mood-picker').classList.toggle('open');
+}
+
+function selectMood(key) {
+  newMood = key;
+  updateMoodUI();
+  setTimeout(() => document.getElementById('mood-picker').classList.remove('open'), 300);
+}
+
+function updateMoodUI() {
+  if (newMood && MOODS[newMood]) {
+    const m = MOODS[newMood];
+    const moodImgMap = { happy: 'mood_happy.png', calm: 'mood_calm.png', tired: 'mood_tired.png', sad: 'mood_sad.png', angry: 'mood_angry.png' };
+    document.getElementById('mood-current-btn').innerHTML = `<img src="${moodImgMap[newMood]}" style="width:100%;height:100%;object-fit:contain;">`;
+    document.getElementById('mood-label-text').textContent = m.name;
+    document.getElementById('mood-current-btn').style.borderColor = m.hex;
+  } else {
+    document.getElementById('mood-current-btn').innerHTML = `<img src="mood_happy.png" style="width:100%;height:100%;object-fit:contain;">`;
+    document.getElementById('mood-label-text').textContent = '选择心情';
+    document.getElementById('mood-current-btn').style.borderColor = 'var(--border)';
+  }
+  // 高亮选中
+  Object.keys(MOODS).forEach(k => {
+    document.getElementById('mood-opt-' + k)?.classList.toggle('selected', k === newMood);
+  });
+}
+
+function addPhoto() {
+  // 触发文件选择器
+  const input = document.getElementById('photo-input');
+  if (!input) {
+    // 创建隐藏的文件输入框
+    const newInput = document.createElement('input');
+    newInput.type = 'file';
+    newInput.id = 'photo-input';
+    newInput.accept = 'image/*';
+    newInput.multiple = true;
+    newInput.style.display = 'none';
+    newInput.onchange = (e) => {
+      const files = Array.from(e.target.files);
+      files.forEach(file => {
+        newPhotos.push(file);
+      });
+      renderPhotoList();
+      // 清空input以便下次能选同一个文件
+      e.target.value = '';
+    };
+    document.body.appendChild(newInput);
+    newInput.click();
+  } else {
+    input.click();
+  }
+}
+
+function renderPhotoList() {
+  const scroll = document.getElementById('photos-scroll');
+  scroll.innerHTML = '';
+  newPhotos.forEach((p, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'photo-wrapper';
+    
+    // 判断是否是File对象（新上传的）还是字符串（模拟数据/已有记录）
+    const isFile = p instanceof File;
+    const src = isFile ? URL.createObjectURL(p) : p;
+    
+    wrap.innerHTML = `
+      <img class="photo-item" src="${src}">
+      <button class="photo-del" onclick="removePhoto(${i})">×</button>
+    `;
+    scroll.appendChild(wrap);
+  });
+  const addBtn = document.createElement('button');
+  addBtn.className = 'photo-add';
+  addBtn.textContent = '+';
+  addBtn.onclick = addPhoto;
+  scroll.appendChild(addBtn);
+}
+
+function removePhoto(i) {
+  newPhotos.splice(i, 1);
+  renderPhotoList();
+}
+
+async function saveEntry() {
+  const text = document.getElementById('new-textarea').value.trim();
+  if (!text && !newMood && newPhotos.length === 0) {
+    showToast('请写点什么或添加图片');
+    return;
+  }
+
+  showToast('正在保存...');
+
+  try {
+    const { db, storage, collection, addDoc, query, where, getDocs, updateDoc, ref, uploadBytes, getDownloadURL } = window.firebaseApp;
+
+    // 上传新照片（File对象）
+    const photoUrls = [];
+    const existingUrls = window._originalPhotos || [];
+
+    // 先保留原有的URL
+    photoUrls.push(...existingUrls);
+
+    // 上传新照片
+    for (let i = 0; i < newPhotos.length; i++) {
+      const photo = newPhotos[i];
+      // 跳过已有的URL（非File对象）
+      if (!(photo instanceof File)) {
+        continue;
+      }
+      const storageRef = ref(storage, `photos/${editingDate}/${Date.now()}_${i}.jpg`);
+      await uploadBytes(storageRef, photo);
+      const url = await getDownloadURL(storageRef);
+      photoUrls.push(url);
+    }
+
+    // 保存到Firestore
+    const entryData = {
+      date: editingDate,
+      mood: newMood,
+      text: text,
+      photos: photoUrls,
+      createdAt: new Date().toISOString()
+    };
+
+    // 检查是否已存在该日期的记录
+    const q = query(collection(db, 'entries'), where('date', '==', editingDate));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      // 新增
+      await addDoc(collection(db, 'entries'), entryData);
+    } else {
+      // 更新已有记录
+      const docRef = querySnapshot.docs[0].ref;
+      await updateDoc(docRef, {
+        mood: newMood,
+        text: text,
+        photos: photoUrls,
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    showToast('已保存');
+    setTimeout(() => {
+      goBack();
+      loadEntriesFromFirebase();
+    }, 300);
+  } catch (error) {
+    console.error('保存失败:', error);
+    showToast('保存失败，请重试');
+  }
+}
+
+// ===== 详情页 =====
+function openDetail(dateStr) {
+  const entry = entries[dateStr];
+  if (!entry) return;
+
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  const wds = ['周日','周一','周二','周三','周四','周五','周六'];
+  const mood = MOODS[entry.mood];
+
+  document.getElementById('detail-title-date').textContent = `${m}月${d}日`;
+  document.getElementById('detail-date').textContent = `${y}年${m}月${d}日`;
+  document.getElementById('detail-weekday').textContent = wds[dt.getDay()];
+
+  // 心情chip
+  const chip = document.getElementById('detail-mood-chip');
+  if (mood) {
+    chip.style.background = mood.hex + '22';
+    chip.style.color = mood.hex;
+    const moodImgMap = { happy: 'mood_happy.png', calm: 'mood_calm.png', tired: 'mood_tired.png', sad: 'mood_sad.png', angry: 'mood_angry.png' };
+    chip.innerHTML = `<img src="${moodImgMap[entry.mood]}" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"> ${mood.name}`;
+    chip.style.display = 'inline-flex';
+  } else {
+    chip.style.display = 'none';
+  }
+
+  // 图片
+  const photos = document.getElementById('detail-photos');
+  photos.innerHTML = '';
+  if (entry.photos && entry.photos.length > 0) {
+    entry.photos.forEach(p => {
+      const img = document.createElement('img');
+      img.className = 'detail-photo';
+      img.src = p;
+      photos.appendChild(img);
+    });
+  }
+
+  document.getElementById('detail-text').textContent = entry.text || '';
+  document.getElementById('detail-text').style.display = entry.text ? 'block' : 'none';
+
+  // 记录当前详情的日期，用于编辑
+  window._detailDateStr = dateStr;
+  goTo('page-detail');
+}
+
+function editCurrentEntry() {
+  if (window._detailDateStr) openNew(window._detailDateStr);
+}
+
+// ===== 导出弹窗 =====
+function openExportSheet() {
+  document.getElementById('export-modal').classList.add('open');
+}
+function closeExportSheet(e) {
+  if (!e || e.target === document.getElementById('export-modal')) {
+    document.getElementById('export-modal').classList.remove('open');
+  }
+}
+
+// ===== 导出 JPG =====
+let jpgExportMode = 'photo';
+let jpgExportMonths = [currentMonth]; // 支持多选
+
+function openJPGExportSheet() {
+  closeExportSheet();
+  jpgExportMode = 'photo';
+  jpgExportMonths = [currentMonth]; // 默认选中当前月
+  // 初始化UI状态
+  document.getElementById('jpg-mode-mood').classList.toggle('active', jpgExportMode === 'mood');
+  document.getElementById('jpg-mode-photo').classList.toggle('active', jpgExportMode === 'photo');
+  document.querySelectorAll('.export-month-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', jpgExportMonths.includes(i));
+  });
+  document.getElementById('jpg-export-modal').classList.add('open');
+  updatePreview();
+}
+
+function closeJPGExportSheet(e) {
+  if (!e || e.target === document.getElementById('jpg-export-modal')) {
+    document.getElementById('jpg-export-modal').classList.remove('open');
+  }
+}
+
+function setJPGExportMode(mode) {
+  jpgExportMode = mode;
+  document.getElementById('jpg-mode-mood').classList.toggle('active', mode === 'mood');
+  document.getElementById('jpg-mode-photo').classList.toggle('active', mode === 'photo');
+  updatePreview();
+}
+
+function setJPGExportMonth(month) {
+  // 切换选中状态（多选模式）
+  const idx = jpgExportMonths.indexOf(month);
+  if (idx > -1) {
+    jpgExportMonths.splice(idx, 1);
+  } else {
+    jpgExportMonths.push(month);
+  }
+  // 确保至少选中一个月
+  if (jpgExportMonths.length === 0) {
+    jpgExportMonths.push(month);
+  }
+  document.querySelectorAll('.export-month-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', jpgExportMonths.includes(i));
+  });
+  updatePreview();
+}
+
+function updatePreview() {
+  const container = document.getElementById('jpg-preview-container');
+  const year = currentYear;
+  const previewMonth = jpgExportMonths[0] || currentMonth; // 预览第一个选中的月
+  const month = MONTH_NAMES[previewMonth];
+  const daysInMonth = new Date(year, previewMonth + 1, 0).getDate();
+  const firstDay = new Date(year, previewMonth, 1).getDay();
+  const offset = firstDay === 0 ? 6 : firstDay - 1;
+
+  container.innerHTML = `
+    <div style="text-align:center; margin-bottom:16px;">
+      <div style="font-size:18px; font-family:'Courier','HuiwenMincho',serif; font-weight:500; margin-bottom:4px;">${month}</div>
+      <div style="font-size:12px; color:#888; font-family:'Courier','HuiwenMincho',serif;">${year}</div>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center;">
+      ${WEEKDAYS_MON.map(w => `<div style="font-size:10px; color:#888; padding:2px 0; font-family:'Courier','HuiwenMincho',serif;">${w}</div>`).join('')}
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-top:4px;">
+      ${Array(offset).fill('<div></div>').join('')}
+      ${Array.from({length: daysInMonth}, (_, i) => {
+        const d = i + 1;
+        const dateStr = `${year}-${String(previewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const entry = entries[dateStr];
+        const isToday = new Date(year, previewMonth, d).toDateString() === TODAY.toDateString();
+        const isFuture = new Date(year, previewMonth, d) > TODAY;
+        const cellStyle = isFuture ? 'opacity:0.3' : (isToday ? 'font-weight:700;' : '');
+        const hasEntry = entry && !isFuture;
+        const numStyle = hasEntry ? 'color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'color:var(--text-primary);';
+        return `<div style="aspect-ratio:1; border-radius:6px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:11px; font-family:'Courier','HuiwenMincho',serif; position:relative; overflow:hidden;">
+          <span style="${cellStyle}; ${numStyle}; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:3; line-height:1;">${d}</span>
+          ${hasEntry ? (jpgExportMode === 'mood' && entry.mood ? `<div style="position:absolute; width:50%; height:50%; opacity:0.4; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1;"><img src="${{happy:'mood_happy.png',calm:'mood_calm.png',tired:'mood_tired.png',sad:'mood_sad.png',angry:'mood_angry.png'}[entry.mood]}" style="width:100%;height:100%;object-fit:contain;"></div>` : (entry.photos && entry.photos.length > 0 ? `<div style="position:absolute; inset:0; z-index:1; border-radius:6px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : '')) : ''}
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function confirmJPGExport() {
+  document.getElementById('jpg-export-modal').classList.remove('open');
+
+  // 批量导出所有选中的月份
+  const sortedMonths = [...jpgExportMonths].sort((a, b) => a - b);
+  let exportIndex = 0;
+
+  const exportNextMonth = () => {
+    if (exportIndex >= sortedMonths.length) {
+      showToast(`已导出 ${sortedMonths.length} 个月`);
+      return;
+    }
+
+    const monthIdx = sortedMonths[exportIndex];
+    const canvasContainer = document.createElement('div');
+    canvasContainer.style.position = 'fixed';
+    canvasContainer.style.left = '-9999px';
+    canvasContainer.style.top = '0';
+    canvasContainer.style.width = '800px';
+    canvasContainer.style.background = '#fff';
+    canvasContainer.style.padding = '40px';
+    canvasContainer.id = `export-canvas-${monthIdx}`;
+    document.body.appendChild(canvasContainer);
+
+    const year = currentYear;
+    const month = MONTH_NAMES[monthIdx];
+    const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+    const firstDay = new Date(year, monthIdx, 1).getDay();
+    const offset = firstDay === 0 ? 6 : firstDay - 1;
+
+  canvasContainer.innerHTML = `
+    <div style="text-align:center; margin-bottom:30px;">
+      <div style="font-size:32px; font-family:'Courier','HuiwenMincho',serif; font-weight:600; margin-bottom:8px;">${month}</div>
+      <div style="font-size:20px; color:#888; font-family:'Courier','HuiwenMincho',serif;">${year}</div>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:8px; text-align:center;">
+      ${WEEKDAYS_MON.map(w => `<div style="font-size:14px; color:#888; padding:8px 0; font-family:'Courier','HuiwenMincho',serif;">${w}</div>`).join('')}
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:8px;">
+      ${Array(offset).fill('<div></div>').join('')}
+      ${Array.from({length: daysInMonth}, (_, i) => {
+        const d = i + 1;
+        const dateStr = `${year}-${String(monthIdx+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const entry = entries[dateStr];
+        const isToday = new Date(year, monthIdx, d).toDateString() === TODAY.toDateString();
+        const isFuture = new Date(year, monthIdx, d) > TODAY;
+        const cellStyle = isFuture ? 'opacity:0.3' : (isToday ? 'font-weight:700;' : '');
+        const hasEntry = entry && !isFuture;
+        const numStyle = hasEntry ? 'color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'color:var(--text-primary);';
+        return `<div style="aspect-ratio:1; border-radius:8px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:16px; font-family:'Courier','HuiwenMincho',serif; position:relative; overflow:hidden;">
+          <span style="${cellStyle}; ${numStyle}; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:3; line-height:1;">${d}</span>
+          ${hasEntry ? (jpgExportMode === 'mood' && entry.mood ? `<div style="position:absolute; width:60%; height:60%; opacity:0.5; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1;"><img src="${{happy:'mood_happy.png',calm:'mood_calm.png',tired:'mood_tired.png',sad:'mood_sad.png',angry:'mood_angry.png'}[entry.mood]}" style="width:100%;height:100%;object-fit:contain;"></div>` : (entry.photos && entry.photos.length > 0 ? `<div style="position:absolute; inset:0; z-index:1; border-radius:8px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : '')) : ''}
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+
+    if (typeof html2canvas === 'undefined') {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+      script.onload = () => renderAndDownload(canvasContainer, month, year, exportNextMonth);
+      document.head.appendChild(script);
+    } else {
+      renderAndDownload(canvasContainer, month, year, exportNextMonth);
+    }
+
+    exportIndex++;
+  };
+
+  exportNextMonth();
+}
+
+function renderAndDownload(canvasContainer, month, year, callback) {
+  html2canvas(canvasContainer, {
+    scale: 2,
+    backgroundColor: '#fff',
+    useCORS: true
+  }).then(canvas => {
+    const link = document.createElement('a');
+    link.download = `${month}_${year}.jpg`;
+    link.href = canvas.toDataURL('image/jpeg', 0.9);
+    link.click();
+    document.body.removeChild(canvasContainer);
+    if (callback) callback();
+  }).catch(err => {
+    console.error(err);
+    showToast('导出失败');
+    document.body.removeChild(canvasContainer);
+  });
+}
+
+// ===== 年度视图入口 =====
+const origGoTo = goTo;
+window.goTo = function(pageId) {
+  origGoTo(pageId);
+  if (pageId === 'page-year') renderYear();
+};
+
+// ===== 初始化 =====
+renderHome();
+// 初始化年历按钮状态
+document.getElementById('year-btn-mood').classList.toggle('active', yearMode === 'mood');
+document.getElementById('year-btn-photo').classList.toggle('active', yearMode === 'photo');
+// 初始化视图切换按钮图标
+toggleCalViewIcon();
+</script>
+</body>
+</html>
