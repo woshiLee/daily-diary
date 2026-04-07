@@ -46,8 +46,14 @@
     where,
     ref,
     uploadBytes,
-    getDownloadURL
+    getDownloadURL,
+    onSnapshot
   };
+  // Firebase 初始化完成，通知页面
+  window.firebaseReady = true;
+  if (typeof window.onFirebaseReady === 'function') {
+    window.onFirebaseReady();
+  }
 </script>
     <style>
   @font-face {
@@ -986,7 +992,7 @@ const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'
 const CN_MONTH_NAMES = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
 const WEEKDAYS_MON = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const CN_WEEKDAYS = ['周一','周二','周三','周四','周五','周六','周日'];
-const TODAY = new Date(2026, 3, 4); // 2026-04-04
+const TODAY = new Date();
 
 // ===== 页面切换 =====
 function goTo(pageId) {
@@ -1808,6 +1814,16 @@ document.getElementById('year-btn-mood').classList.toggle('active', yearMode ===
 document.getElementById('year-btn-photo').classList.toggle('active', yearMode === 'photo');
 // 初始化视图切换按钮图标
 toggleCalViewIcon();
+
+// 从 Firebase 加载真实数据（等 Firebase SDK 初始化完成）
+function initFirebase() {
+  loadEntriesFromFirebase();
+}
+if (window.firebaseReady) {
+  initFirebase();
+} else {
+  window.onFirebaseReady = initFirebase;
+}
 </script>
 </body>
 </html>
