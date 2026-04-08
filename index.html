@@ -1170,7 +1170,7 @@ function renderCalendar() {
     num.textContent = d;
     cell.appendChild(num);
 
-    if (entry && !isFuture) {
+    if (entry) {
       if (calView === 'mood') {
         // 心情模式：显示心情图片
         if (entry.mood) {
@@ -1196,9 +1196,7 @@ function renderCalendar() {
       }
     }
 
-    if (!isFuture) {
-      cell.onclick = () => selectDate(dateStr, d);
-    }
+    cell.onclick = () => selectDate(dateStr, d);
     grid.appendChild(cell);
   }
 }
