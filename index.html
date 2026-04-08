@@ -441,89 +441,47 @@
 
   /* ===== 详情页 ===== */
   #page-detail { background: var(--bg); }
+  .detail-swipe-container {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+  }
   .detail-content {
     flex: 1;
     display: flex;
     flex-direction: column;
     background: var(--bg);
     position: relative;
+    z-index: 2;
+    transition: transform 0.25s ease-out;
+  }
+  .detail-content.swiped-left {
+    transform: translateX(-70px);
   }
   .detail-body {
     padding: 20px;
     flex: 1;
-    -webkit-user-select: none;
-    user-select: none;
-    -webkit-touch-callout: none;
-    touch-action: manipulation;
   }
-  
-  /* 长按菜单 */
-  .long-press-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1000;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-  }
-  .long-press-overlay.active {
-    display: flex;
-  }
-  .long-press-backdrop {
+  .detail-delete-btn {
     position: absolute;
-    top: 0;
-    left: 0;
     right: 0;
+    top: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-  }
-  .long-press-card {
-    position: relative;
-    background: var(--card-bg);
-    border-radius: var(--radius);
-    width: 100%;
-    max-width: 320px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    transform: scale(0.9);
-    opacity: 0;
-    transition: transform 0.3s ease, opacity 0.3s ease;
-    overflow: hidden;
-  }
-  .long-press-overlay.active .long-press-card {
-    transform: scale(1);
-    opacity: 1;
-  }
-  .long-press-content {
-    padding: 20px;
-    max-height: 50vh;
-    overflow-y: auto;
-  }
-  .long-press-delete {
-    width: 100%;
-    padding: 16px;
+    width: 70px;
     background: #FF3B30;
-    color: white;
-    border: none;
-    font-size: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    z-index: 1;
     cursor: pointer;
-    font-family: inherit;
   }
-  .long-press-delete svg {
-    width: 20px;
-    height: 20px;
+  .detail-delete-btn svg {
+    width: 28px;
+    height: 28px;
     stroke: #fff;
   }
-  .long-press-delete:active {
+  .detail-delete-btn:active {
     background: #E62E24;
   }
   .detail-photos {
@@ -901,38 +859,23 @@
       </svg>
     </button>
   </div>
-  <div class="detail-content" id="detail-content">
-    <div style="overflow-y:auto; flex:1;">
-      <div class="detail-photos" id="detail-photos"></div>
-      <div class="detail-body" id="detail-body">
-        <div class="detail-date" id="detail-date"></div>
-        <div class="detail-weekday" id="detail-weekday"></div>
-        <div class="detail-mood-chip" id="detail-mood-chip"></div>
-        <div class="detail-text" id="detail-text"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 长按菜单遮罩 -->
-  <div class="long-press-overlay" id="long-press-overlay" onclick="closeLongPressMenu()">
-    <div class="long-press-backdrop"></div>
-    <div class="long-press-card" id="long-press-card">
-      <div class="long-press-content">
-        <div class="detail-photos" id="menu-photos"></div>
-        <div class="detail-body">
-          <div class="detail-date" id="menu-date"></div>
-          <div class="detail-weekday" id="menu-weekday"></div>
-          <div class="detail-mood-chip" id="menu-mood-chip"></div>
-          <div class="detail-text" id="menu-text"></div>
+  <div class="detail-swipe-container" id="detail-swipe-container">
+    <div class="detail-content" id="detail-content">
+      <div style="overflow-y:auto; flex:1;">
+        <div class="detail-photos" id="detail-photos"></div>
+        <div class="detail-body" id="detail-body">
+          <div class="detail-date" id="detail-date"></div>
+          <div class="detail-weekday" id="detail-weekday"></div>
+          <div class="detail-mood-chip" id="detail-mood-chip"></div>
+          <div class="detail-text" id="detail-text"></div>
         </div>
       </div>
-      <button class="long-press-delete" onclick="deleteFromMenu()">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="3 6 5 6 21 6"></polyline>
-          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        </svg>
-        删除日记
-      </button>
+    </div>
+    <div class="detail-delete-btn" id="detail-delete-btn" onclick="deleteCurrentEntry()">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
     </div>
   </div>
 </div>
@@ -2145,116 +2088,71 @@ function openDetail(dateStr) {
   // 记录当前详情的日期，用于编辑
   window._detailDateStr = dateStr;
   
-  // 绑定长按事件（只绑定一次）
-  if (!window._longPressBound) {
-    bindLongPress();
-    window._longPressBound = true;
+  // 重置滑动状态
+  const content = document.getElementById('detail-content');
+  content.classList.remove('swiped-left');
+  
+  // 绑定右滑事件（只绑定一次）
+  if (!window._detailSwipeBound) {
+    bindDetailSwipe();
+    window._detailSwipeBound = true;
   }
   
   goTo('page-detail');
 }
 
-// 详情页长按菜单
-function bindLongPress() {
-  const detailBody = document.getElementById('detail-body');
-  let pressTimer = null;
-  let isPressing = false;
+// 详情页右滑删除
+function bindDetailSwipe() {
+  const container = document.getElementById('detail-swipe-container');
+  const content = document.getElementById('detail-content');
   let startX = 0;
-  let startY = 0;
+  let currentX = 0;
+  let isDragging = false;
   
-  const startPress = (e) => {
-    // 忽略按钮点击
-    if (e.target.closest('button')) return;
-    
-    // 记录起始位置
-    if (e.touches) {
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-    }
-    
-    isPressing = true;
-    pressTimer = setTimeout(() => {
-      if (isPressing) {
-        showLongPressMenu();
-        isPressing = false;
-      }
-    }, 500); // 500ms 长按触发
-  };
-  
-  const cancelPress = () => {
-    isPressing = false;
-    if (pressTimer) {
-      clearTimeout(pressTimer);
-      pressTimer = null;
-    }
-  };
-  
-  const movePress = (e) => {
-    if (!isPressing) return;
-    // 如果移动超过10px，取消长按
-    if (e.touches) {
-      const dx = Math.abs(e.touches[0].clientX - startX);
-      const dy = Math.abs(e.touches[0].clientY - startY);
-      if (dx > 10 || dy > 10) {
-        cancelPress();
-      }
-    }
-  };
-  
-  // 触摸事件 - 阻止默认行为防止文字选择
-  detailBody.addEventListener('touchstart', (e) => {
-    startPress(e);
-  }, { passive: false });
-  
-  detailBody.addEventListener('touchend', (e) => {
-    cancelPress();
-  });
-  
-  detailBody.addEventListener('touchmove', (e) => {
-    movePress(e);
+  container.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX;
+    isDragging = true;
   }, { passive: true });
   
-  detailBody.addEventListener('touchcancel', cancelPress);
+  container.addEventListener('touchmove', (e) => {
+    if (!isDragging) return;
+    currentX = e.touches[0].clientX;
+    const diff = startX - currentX;
+    
+    // 左滑（从右向左）显示删除按钮
+    if (diff > 0 && diff < 80) {
+      content.style.transform = `translateX(-${diff}px)`;
+    }
+  }, { passive: true });
   
-  // 阻止上下文菜单（长按弹出的菜单）
-  detailBody.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    return false;
+  container.addEventListener('touchend', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    
+    const diff = startX - currentX;
+    content.style.transform = '';
+    
+    if (diff > 40) {
+      // 滑动超过阈值，显示删除按钮
+      content.classList.add('swiped-left');
+    } else {
+      // 恢复原位
+      content.classList.remove('swiped-left');
+    }
   });
   
-  // 鼠标事件（用于桌面端测试）
-  detailBody.addEventListener('mousedown', startPress);
-  detailBody.addEventListener('mouseup', cancelPress);
-  detailBody.addEventListener('mouseleave', cancelPress);
-  detailBody.addEventListener('mousemove', movePress);
-}
-
-// 显示长按菜单
-function showLongPressMenu() {
-  const dateStr = window._detailDateStr;
-  const entry = entries[dateStr];
-  if (!entry) return;
+  container.addEventListener('touchcancel', () => {
+    isDragging = false;
+    content.style.transform = '';
+  });
   
-  // 复制内容到菜单卡片
-  document.getElementById('menu-photos').innerHTML = document.getElementById('detail-photos').innerHTML;
-  document.getElementById('menu-date').textContent = document.getElementById('detail-date').textContent;
-  document.getElementById('menu-weekday').textContent = document.getElementById('detail-weekday').textContent;
-  document.getElementById('menu-mood-chip').innerHTML = document.getElementById('detail-mood-chip').innerHTML;
-  document.getElementById('menu-text').textContent = document.getElementById('detail-text').textContent;
-  
-  // 显示菜单
-  document.getElementById('long-press-overlay').classList.add('active');
-}
-
-// 关闭长按菜单
-function closeLongPressMenu() {
-  document.getElementById('long-press-overlay').classList.remove('active');
-}
-
-// 从菜单删除
-function deleteFromMenu() {
-  closeLongPressMenu();
-  setTimeout(() => deleteCurrentEntry(), 300);
+  // 点击内容区域恢复原位
+  content.addEventListener('click', (e) => {
+    if (content.classList.contains('swiped-left')) {
+      e.stopPropagation();
+      content.classList.remove('swiped-left');
+    }
+  });
 }
 
 // 删除当前日记
