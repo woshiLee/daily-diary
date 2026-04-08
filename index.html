@@ -440,16 +440,13 @@
   }
 
   /* ===== 详情页 ===== */
-  #page-detail { 
-    background: var(--bg); 
-    display: flex;
-    flex-direction: column;
-  }
+  #page-detail { background: var(--bg); }
   .detail-swipe-wrapper {
     position: relative;
     flex: 1;
     overflow: hidden;
     display: flex;
+    min-height: calc(100vh - 60px);
   }
   .detail-content {
     flex: 1;
