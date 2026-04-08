@@ -1135,10 +1135,12 @@ function selectDate(dateStr, day) {
   document.querySelectorAll('.day-cell').forEach(c => c.classList.remove('selected'));
   const targetCell = document.querySelector(`.day-cell[data-date="${dateStr}"]`);
   if (targetCell) targetCell.classList.add('selected');
-  // 滚动到列表中对应日期的卡片
-  const targetCard = document.querySelector(`.entry-card[data-date="${dateStr}"]`);
-  if (targetCard) {
-    targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  
+  // 如果有记录则打开详情，否则打开新建
+  if (entries[dateStr]) {
+    openDetail(dateStr);
+  } else {
+    openNew(dateStr);
   }
 }
 
@@ -1497,6 +1499,13 @@ async function saveEntry() {
   const text = document.getElementById('new-textarea').value.trim();
   if (!text && !newMood && newPhotos.length === 0) {
     showToast('请写点什么或添加图片');
+    return;
+  }
+
+  // 检查 Firebase 是否初始化
+  if (!window.firebaseApp || !window.firebaseApp.db) {
+    showToast('Firebase 未初始化，请刷新页面重试');
+    console.error('Firebase not initialized:', window.firebaseApp);
     return;
   }
 
