@@ -1497,6 +1497,8 @@ function removePhoto(i) {
 
 async function saveEntry() {
   const text = document.getElementById('new-textarea').value.trim();
+  console.log('保存开始:', { text, newMood, newPhotosLength: newPhotos.length, editingDate });
+  
   if (!text && !newMood && newPhotos.length === 0) {
     showToast('请写点什么或添加图片');
     return;
@@ -1514,25 +1516,25 @@ async function saveEntry() {
   try {
     const { db, storage, collection, addDoc, query, where, getDocs, updateDoc, ref, uploadBytes, getDownloadURL } = window.firebaseApp;
 
-    // 上传新照片（File对象）
+    // 正确处理照片：newPhotos 中可能混合了 File 对象（新上传）和 URL 字符串（已有）
     const photoUrls = [];
-    const existingUrls = window._originalPhotos || [];
-
-    // 先保留原有的URL
-    photoUrls.push(...existingUrls);
-
-    // 上传新照片
+    
+    // 遍历 newPhotos，区分 File 对象和 URL 字符串
     for (let i = 0; i < newPhotos.length; i++) {
       const photo = newPhotos[i];
-      // 跳过已有的URL（非File对象）
-      if (!(photo instanceof File)) {
-        continue;
+      if (photo instanceof File) {
+        // 新上传的文件，上传到 Storage
+        const storageRef = ref(storage, `photos/${editingDate}/${Date.now()}_${i}.jpg`);
+        await uploadBytes(storageRef, photo);
+        const url = await getDownloadURL(storageRef);
+        photoUrls.push(url);
+      } else if (typeof photo === 'string' && photo.startsWith('http')) {
+        // 已有的 URL，直接保留
+        photoUrls.push(photo);
       }
-      const storageRef = ref(storage, `photos/${editingDate}/${Date.now()}_${i}.jpg`);
-      await uploadBytes(storageRef, photo);
-      const url = await getDownloadURL(storageRef);
-      photoUrls.push(url);
     }
+
+    console.log('照片处理完成:', photoUrls);
 
     // 保存到Firestore
     const entryData = {
@@ -1543,6 +1545,8 @@ async function saveEntry() {
       createdAt: new Date().toISOString()
     };
 
+    console.log('准备保存数据:', entryData);
+
     // 检查是否已存在该日期的记录
     const q = query(collection(db, 'entries'), where('date', '==', editingDate));
     const querySnapshot = await getDocs(q);
@@ -1550,6 +1554,7 @@ async function saveEntry() {
     if (querySnapshot.empty) {
       // 新增
       await addDoc(collection(db, 'entries'), entryData);
+      console.log('新增记录成功');
     } else {
       // 更新已有记录
       const docRef = querySnapshot.docs[0].ref;
@@ -1559,6 +1564,7 @@ async function saveEntry() {
         photos: photoUrls,
         updatedAt: new Date().toISOString()
       });
+      console.log('更新记录成功');
     }
 
     showToast('已保存');
@@ -1568,7 +1574,7 @@ async function saveEntry() {
     }, 300);
   } catch (error) {
     console.error('保存失败:', error);
-    showToast('保存失败，请重试');
+    showToast('保存失败: ' + error.message);
   }
 }
 
