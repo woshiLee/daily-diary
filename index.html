@@ -362,12 +362,12 @@
   }
   .mood-label { font-size: 14px; color: var(--text-secondary); flex: 1; }
   .mood-picker {
-    position: absolute; bottom: 54px; left: 0; right: 0;
+    position: fixed; bottom: 0; left: 0; right: 0;
     background: var(--card-bg);
     border-radius: 16px 16px 0 0;
     padding: 16px 20px 20px;
     box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
-    display: none; z-index: 50;
+    display: none; z-index: 100;
   }
   .mood-picker.open { display: block; }
   .mood-picker-title { font-size: 11px; color: var(--text-secondary); margin-bottom: 14px; }
