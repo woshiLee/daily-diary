@@ -1134,11 +1134,11 @@ if ('serviceWorker' in navigator) {
 
 // ===== 数据 =====
 const MOODS = {
-  happy:  { emoji:'😄', name:'开心', color:'var(--mood-happy)',  hex:'#FFD166' },
-  calm:   { emoji:'😌', name:'宁静', color:'var(--mood-calm)',   hex:'#06D6A0' },
-  tired:  { emoji:'😩', name:'疲惫', color:'var(--mood-tired)',  hex:'#F4A261' },
-  sad:    { emoji:'😢', name:'难过', color:'var(--mood-sad)',    hex:'#118AB2' },
-  angry:  { emoji:'😡', name:'愤怒', color:'var(--mood-angry)',  hex:'#EF476F' },
+  happy:  { emoji:'😄', name:'开心', color:'var(--mood-happy)',  hex:'#7CB342' },
+  calm:   { emoji:'😌', name:'宁静', color:'var(--mood-calm)',   hex:'#D9F2C1' },
+  tired:  { emoji:'😩', name:'疲惫', color:'var(--mood-tired)',  hex:'#E6E5C8' },
+  sad:    { emoji:'😢', name:'难过', color:'var(--mood-sad)',    hex:'#E6B85C' },
+  angry:  { emoji:'😡', name:'愤怒', color:'var(--mood-angry)',  hex:'#A1887F' },
 };
 
 // 日记数据（从 Firebase 加载，不再使用模拟数据）
@@ -1330,13 +1330,8 @@ function renderCalendar() {
         if (entry.mood) {
           cell.classList.add('mood-cell');
           cell.style.backgroundColor = MOODS[entry.mood].hex;
-          // 根据背景亮度调整文字颜色
-          const darkMoods = ['calm', 'angry'];
-          if (darkMoods.includes(entry.mood)) {
-            num.style.color = '#fff';
-          } else {
-            num.style.color = '#1A1A1A';
-          }
+          // 根据背景亮度调整文字颜色（新颜色系列都是浅色系，统一用深色文字）
+          num.style.color = '#1A1A1A';
         }
       } else {
         // 图片模式：显示图片缩略图或文字指示
