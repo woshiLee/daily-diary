@@ -10,11 +10,14 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>日常书</title>
+<!-- Eruda 移动端调试工具 -->
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>eruda.init();</script>
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
   import { getAnalytics } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js';
-  import { getFirestore, collection, addDoc, getDocs, doc, getDoc, updateDoc, query, orderBy, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+  import { getFirestore, collection, addDoc, getDocs, doc, getDoc, updateDoc, setDoc, query, orderBy, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
   import { getStorage, ref, uploadBytes, getDownloadURL, listAll, deleteObject } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 
   const firebaseConfig = {
@@ -42,6 +45,7 @@
     doc,
     getDoc,
     updateDoc,
+    setDoc,
     query,
     where,
     ref,
@@ -257,16 +261,45 @@
     font-size: 13px; color: var(--text-secondary);
     margin-bottom: 12px; font-weight: 400;
   }
+  /* 滑动删除容器 */
+  .entry-card-wrapper {
+    position: relative;
+    margin-bottom: 12px;
+    overflow: hidden;
+    border-radius: var(--radius);
+  }
   .entry-card {
     background: var(--card-bg);
     border-radius: var(--radius);
     padding: 14px;
-    margin-bottom: 12px;
     cursor: pointer;
     display: flex; gap: 12px; align-items: center;
-    transition: transform 0.12s, background-color 0.15s;
+    transition: transform 0.2s ease-out;
+    position: relative;
+    z-index: 2;
   }
-  .entry-card:active { transform: scale(0.98); background-color: var(--border); }
+  .entry-card:active { background-color: var(--border); }
+  .entry-card.swiped { transform: translateX(-70px); }
+  
+  /* 删除按钮 */
+  .entry-delete-btn {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 70px;
+    background: #FF3B30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    cursor: pointer;
+  }
+  .entry-delete-btn svg {
+    width: 24px;
+    height: 24px;
+    stroke: #fff;
+  }
   .entry-date-col { min-width: 50px; text-align: center; }
   .entry-day-num { font-size: 18px; font-weight: 700; line-height: 1; font-family: 'Courier', 'HuiwenMincho', serif !important; }
   .entry-weekday { font-size: 8px; color: var(--text-secondary); margin-top: 2px; font-family: 'Courier', 'HuiwenMincho', serif !important; }
@@ -1136,11 +1169,25 @@ function selectDate(dateStr, day) {
   const targetCell = document.querySelector(`.day-cell[data-date="${dateStr}"]`);
   if (targetCell) targetCell.classList.add('selected');
   
-  // 如果有记录则打开详情，否则打开新建
+  // 如果有记录则滚动到列表对应位置，否则打开新建
   if (entries[dateStr]) {
-    openDetail(dateStr);
+    scrollToEntry(dateStr);
   } else {
     openNew(dateStr);
+  }
+}
+
+// 滚动到指定日期的日记卡片
+function scrollToEntry(dateStr) {
+  const card = document.querySelector(`.entry-card[data-date="${dateStr}"]`);
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // 高亮一下卡片
+    card.style.transition = 'background-color 0.3s';
+    card.style.backgroundColor = 'rgba(255, 209, 102, 0.3)';
+    setTimeout(() => {
+      card.style.backgroundColor = '';
+    }, 1000);
   }
 }
 
@@ -1170,11 +1217,29 @@ function renderEntriesList() {
     const wd = weekDayNames[dt.getDay()];
     const mood = MOODS[entry.mood];
 
+    // 创建滑动删除容器
+    const wrapper = document.createElement('div');
+    wrapper.className = 'entry-card-wrapper';
+    
+    // 删除按钮
+    const deleteBtn = document.createElement('div');
+    deleteBtn.className = 'entry-delete-btn';
+    deleteBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+    `;
+    deleteBtn.onclick = (e) => {
+      e.stopPropagation();
+      deleteEntry(dateStr);
+    };
+    
+    // 卡片内容
     const card = document.createElement('div');
     card.className = 'entry-card';
     card.setAttribute('data-date', dateStr);
-    card.onclick = () => openDetail(dateStr);
-
+    
     const thumbsHTML = (entry.photos || []).slice(0,3).map(p =>
       `<img class="entry-thumb" src="${p}">`
     ).join('');
@@ -1190,8 +1255,92 @@ function renderEntriesList() {
         ${entry.text ? `<div class="entry-text">${entry.text}</div>` : ''}
       </div>
     `;
-    container.appendChild(card);
+    
+    // 点击卡片打开详情
+    card.onclick = () => openDetail(dateStr);
+    
+    // 添加滑动手势
+    let startX = 0;
+    let currentX = 0;
+    let isSwiped = false;
+    
+    card.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+    }, { passive: true });
+    
+    card.addEventListener('touchmove', (e) => {
+      currentX = e.touches[0].clientX;
+      const diff = startX - currentX;
+      
+      // 左滑显示删除按钮
+      if (diff > 0 && diff < 80) {
+        card.style.transform = `translateX(-${diff}px)`;
+      }
+    }, { passive: true });
+    
+    card.addEventListener('touchend', () => {
+      const diff = startX - currentX;
+      
+      if (diff > 40) {
+        // 滑动超过阈值，显示删除按钮
+        card.classList.add('swiped');
+        card.style.transform = '';
+        isSwiped = true;
+      } else {
+        // 恢复原位
+        card.classList.remove('swiped');
+        card.style.transform = '';
+        isSwiped = false;
+      }
+    });
+    
+    // 点击其他地方恢复原位
+    card.addEventListener('click', (e) => {
+      if (isSwiped) {
+        e.stopPropagation();
+        card.classList.remove('swiped');
+        isSwiped = false;
+      }
+    });
+    
+    wrapper.appendChild(deleteBtn);
+    wrapper.appendChild(card);
+    container.appendChild(wrapper);
   });
+}
+
+// ===== 删除日记 =====
+async function deleteEntry(dateStr) {
+  if (!confirm('确定要删除这篇日记吗？')) {
+    return;
+  }
+  
+  showToast('正在删除...');
+  
+  try {
+    // 从 Firebase 删除
+    if (window.firebaseApp && window.firebaseApp.db) {
+      const { db, collection, query, where, getDocs, deleteDoc, doc } = window.firebaseApp;
+      const q = query(collection(db, 'entries'), where('date', '==', dateStr));
+      const querySnapshot = await getDocs(q);
+      
+      for (const docSnapshot of querySnapshot.docs) {
+        await deleteDoc(doc(db, 'entries', docSnapshot.id));
+      }
+    }
+    
+    // 从本地数据中删除
+    delete entries[dateStr];
+    
+    // 刷新界面
+    renderCalendar();
+    renderEntriesList();
+    
+    showToast('日记已删除');
+  } catch (error) {
+    console.error('删除失败:', error);
+    showToast('删除失败，请重试');
+  }
 }
 
 // ===== 月历切换心情/图片 =====
@@ -1495,9 +1644,94 @@ function removePhoto(i) {
   renderPhotoList();
 }
 
+// 将 File 转为 Base64
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// 压缩图片（带超时保护）
+function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    // 5秒超时保护
+    const timeout = setTimeout(() => {
+      reject(new Error('图片处理超时'));
+    }, 5000);
+    
+    const img = new Image();
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      img.src = e.target.result;
+    };
+    
+    reader.onerror = (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    };
+    
+    img.onload = () => {
+      try {
+        let width = img.width;
+        let height = img.height;
+        
+        // 计算缩放比例
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.floor(width * ratio);
+          height = Math.floor(height * ratio);
+        }
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // 转换为 Base64，尝试不同质量直到大小合适
+        let resultQuality = quality;
+        let base64 = canvas.toDataURL('image/jpeg', resultQuality);
+        
+        // 如果还是太大，降低质量
+        let attempts = 0;
+        while (base64.length > 900 * 1024 && resultQuality > 0.3 && attempts < 5) {
+          resultQuality -= 0.15;
+          base64 = canvas.toDataURL('image/jpeg', resultQuality);
+          attempts++;
+        }
+        
+        clearTimeout(timeout);
+        resolve(base64);
+      } catch (err) {
+        clearTimeout(timeout);
+        reject(err);
+      }
+    };
+    
+    img.onerror = (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    };
+    
+    reader.readAsDataURL(file);
+  });
+}
+
+// 判断是否是文件对象（兼容移动端）
+function isFileObject(obj) {
+  return obj && (obj instanceof File || (obj.name && obj.size && obj.type));
+}
+
 async function saveEntry() {
   const text = document.getElementById('new-textarea').value.trim();
-  console.log('保存开始:', { text, newMood, newPhotosLength: newPhotos.length, editingDate });
+  console.log('=== 保存开始 ===', { text: text?.substring(0, 20), newMood, newPhotosLength: newPhotos.length, editingDate });
   
   if (!text && !newMood && newPhotos.length === 0) {
     showToast('请写点什么或添加图片');
@@ -1507,79 +1741,107 @@ async function saveEntry() {
   // 检查 Firebase 是否初始化
   if (!window.firebaseApp || !window.firebaseApp.db) {
     showToast('Firebase 未初始化，请刷新页面重试');
-    console.error('Firebase not initialized:', window.firebaseApp);
+    console.error('Firebase not initialized');
     return;
   }
 
   showToast('正在保存...');
 
-  try {
-    const { db, storage, collection, addDoc, query, where, getDocs, updateDoc, ref, uploadBytes, getDownloadURL } = window.firebaseApp;
+  // 保存超时保护（15秒）
+  const saveTimeout = setTimeout(() => {
+    console.error('保存超时');
+    showToast('保存超时，请检查网络后重试');
+  }, 15000);
 
-    // 正确处理照片：newPhotos 中可能混合了 File 对象（新上传）和 URL 字符串（已有）
+  try {
+    const { db, setDoc, doc } = window.firebaseApp;
+    
+    console.log('Firebase 已连接，db:', !!db, 'setDoc:', !!setDoc, 'doc:', !!doc);
+
+    // 正确处理照片
     const photoUrls = [];
     
-    // 遍历 newPhotos，区分 File 对象和 URL 字符串
-    for (let i = 0; i < newPhotos.length; i++) {
-      const photo = newPhotos[i];
-      if (photo instanceof File) {
-        // 新上传的文件，上传到 Storage
-        try {
-          const storageRef = ref(storage, `photos/${editingDate}/${Date.now()}_${i}.jpg`);
-          await uploadBytes(storageRef, photo);
-          const url = await getDownloadURL(storageRef);
-          photoUrls.push(url);
-        } catch (uploadError) {
-          console.error('图片上传失败:', uploadError);
-          showToast('图片上传失败，将只保存文字');
-          // 继续保存，只是没有这张图片
+    // 如果没有新照片，直接跳过
+    if (newPhotos.length === 0) {
+      console.log('没有照片需要处理');
+    } else {
+      // 遍历 newPhotos
+      for (let i = 0; i < newPhotos.length; i++) {
+        const photo = newPhotos[i];
+        console.log(`处理第 ${i+1}/${newPhotos.length} 张照片`);
+        
+        // 字符串类型直接保留
+        if (typeof photo === 'string') {
+          console.log('保留已有图片 URL');
+          photoUrls.push(photo);
+          continue;
         }
-      } else if (typeof photo === 'string' && photo.startsWith('http')) {
-        // 已有的 URL，直接保留
-        photoUrls.push(photo);
+        
+        // 检查是否是文件对象
+        const isFile = photo && (photo instanceof File || (photo.name && photo.size));
+        if (!isFile) {
+          console.warn('未知的照片类型，跳过:', typeof photo);
+          continue;
+        }
+        
+        // 处理文件
+        try {
+          showToast(`处理图片 ${i+1}/${newPhotos.length}...`);
+          console.log('压缩图片:', photo.name, photo.size);
+          
+          const base64 = await compressImage(photo, 1200, 1200, 0.8);
+          const sizeInKB = Math.round(base64.length / 1024);
+          
+          if (base64.length > 950 * 1024) {
+            console.log('图片太大，跳过:', sizeInKB, 'KB');
+            showToast('图片太大已跳过');
+            continue;
+          }
+          
+          photoUrls.push(base64);
+          console.log('图片处理完成:', sizeInKB, 'KB');
+        } catch (err) {
+          console.error('图片处理失败:', err.message);
+          showToast('图片处理失败，跳过');
+          // 继续处理下一张
+        }
       }
     }
 
-    console.log('照片处理完成:', photoUrls);
+    console.log('照片处理完成，共', photoUrls.length, '张');
+    showToast('正在写入数据库...');
 
-    // 保存到Firestore
+    // 准备数据
     const entryData = {
       date: editingDate,
       mood: newMood,
       text: text,
       photos: photoUrls,
-      createdAt: new Date().toISOString()
+      updatedAt: new Date().toISOString()
     };
 
-    console.log('准备保存数据:', entryData);
+    console.log('使用 setDoc 直接保存...');
+    
+    // 直接使用 setDoc，用日期作为文档 ID，避免查询
+    const docRef = doc(db, 'entries', editingDate);
+    console.log('docRef 创建成功:', docRef.id);
+    await setDoc(docRef, entryData, { merge: true });
+    console.log('setDoc 调用成功');
 
-    // 检查是否已存在该日期的记录
-    const q = query(collection(db, 'entries'), where('date', '==', editingDate));
-    const querySnapshot = await getDocs(q);
+    // 更新本地数据
+    entries[editingDate] = entryData;
 
-    if (querySnapshot.empty) {
-      // 新增
-      await addDoc(collection(db, 'entries'), entryData);
-      console.log('新增记录成功');
-    } else {
-      // 更新已有记录
-      const docRef = querySnapshot.docs[0].ref;
-      await updateDoc(docRef, {
-        mood: newMood,
-        text: text,
-        photos: photoUrls,
-        updatedAt: new Date().toISOString()
-      });
-      console.log('更新记录成功');
-    }
-
+    clearTimeout(saveTimeout);
     showToast('已保存');
+    console.log('=== 保存完成 ===');
+    
     setTimeout(() => {
       goBack();
-      loadEntriesFromFirebase();
+      renderHome();
     }, 300);
   } catch (error) {
-    console.error('保存失败:', error);
+    clearTimeout(saveTimeout);
+    console.error('=== 保存失败 ===', error);
     showToast('保存失败: ' + error.message);
   }
 }
