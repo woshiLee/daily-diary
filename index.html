@@ -605,6 +605,61 @@
   }
   .export-confirm-btn:active { opacity: 0.8; }
 
+  /* ===== 日期滚轮选择器 ===== */
+  .date-picker-wheel {
+    display: flex;
+    gap: 8px;
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 8px;
+    border: 1.5px solid var(--border);
+  }
+  .wheel-column {
+    flex: 1;
+    height: 120px;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+    text-align: center;
+  }
+  .wheel-column::-webkit-scrollbar {
+    display: none;
+  }
+  .wheel-item {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: var(--text-secondary);
+    scroll-snap-align: center;
+    transition: all 0.2s;
+  }
+  .wheel-item.selected {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 18px;
+  }
+  .wheel-column::before,
+  .wheel-column::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 40px;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .wheel-column::before {
+    top: 0;
+    background: linear-gradient(to bottom, var(--card-bg), transparent);
+  }
+  .wheel-column::after {
+    bottom: 0;
+    background: linear-gradient(to top, var(--card-bg), transparent);
+  }
+
   /* ===== App 底部名称 ===== */
   .app-name-bar {
     text-align: center; padding: 8px;
@@ -894,7 +949,7 @@
   <div class="modal-sheet">
     <div class="modal-title">导出</div>
     <div class="modal-sub">选择导出格式</div>
-    <div class="export-option" onclick="showToast('TXT 导出功能开发中')">
+    <div class="export-option" onclick="openTXTExportSheet()">
       <div class="export-icon">
         <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M6 4h20v24H6zM10 8h12M10 14h12M10 20h8"/>
@@ -919,7 +974,7 @@
         <div class="export-desc">每月月历一张图片</div>
       </div>
     </div>
-    <div class="export-option" onclick="showToast('PDF 导出功能开发中')">
+    <div class="export-option" onclick="openPDFExportSheet()">
       <div class="export-icon">
         <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M6 4h20l-2 24H4L6 4zM10 4V2h12v2M10 16h12"/>
@@ -971,6 +1026,92 @@
     </div>
 
     <button class="export-confirm-btn" onclick="confirmJPGExport()">确定导出</button>
+  </div>
+</div>
+
+<!-- ==================== TXT 导出选择弹窗 ==================== -->
+<div class="modal-overlay" id="txt-export-modal" onclick="closeTXTExportSheet(event)">
+  <div class="modal-sheet" style="max-height:80vh; overflow-y:auto;">
+    <div class="modal-title">导出 TXT</div>
+    <div class="modal-sub">选择导出日期范围</div>
+
+    <!-- 起始日期滚轮 -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">起始日期</div>
+      <div class="date-picker-wheel" id="txt-start-date-wheel">
+        <div class="wheel-column" id="txt-start-year"></div>
+        <div class="wheel-column" id="txt-start-month"></div>
+        <div class="wheel-column" id="txt-start-day"></div>
+      </div>
+    </div>
+
+    <!-- 结束日期滚轮 -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">结束日期</div>
+      <div class="date-picker-wheel" id="txt-end-date-wheel">
+        <div class="wheel-column" id="txt-end-year"></div>
+        <div class="wheel-column" id="txt-end-month"></div>
+        <div class="wheel-column" id="txt-end-day"></div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:20px;">
+      <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">导出内容</div>
+      <div style="display:flex; gap:10px;">
+        <button class="export-mode-btn active" id="txt-mode-all" onclick="setTXTExportMode('all')">全部内容</button>
+        <button class="export-mode-btn" id="txt-mode-text" onclick="setTXTExportMode('text')">仅文字</button>
+      </div>
+    </div>
+
+    <div style="background:var(--bg); border-radius:12px; padding:16px; margin-bottom:20px;">
+      <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">预览</div>
+      <div id="txt-preview-container" style="background:#fff; border-radius:8px; padding:16px; min-height:100px; max-height:200px; overflow-y:auto; font-size:12px; line-height:1.6; white-space:pre-wrap; font-family:'Courier',monospace;"></div>
+    </div>
+
+    <button class="export-confirm-btn" onclick="confirmTXTExport()">确定导出</button>
+  </div>
+</div>
+
+<!-- ==================== PDF 导出选择弹窗 ==================== -->
+<div class="modal-overlay" id="pdf-export-modal" onclick="closePDFExportSheet(event)">
+  <div class="modal-sheet" style="max-height:80vh; overflow-y:auto;">
+    <div class="modal-title">导出 PDF</div>
+    <div class="modal-sub">选择导出日期范围</div>
+
+    <!-- 起始日期滚轮 -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">起始日期</div>
+      <div class="date-picker-wheel" id="pdf-start-date-wheel">
+        <div class="wheel-column" id="pdf-start-year"></div>
+        <div class="wheel-column" id="pdf-start-month"></div>
+        <div class="wheel-column" id="pdf-start-day"></div>
+      </div>
+    </div>
+
+    <!-- 结束日期滚轮 -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">结束日期</div>
+      <div class="date-picker-wheel" id="pdf-end-date-wheel">
+        <div class="wheel-column" id="pdf-end-year"></div>
+        <div class="wheel-column" id="pdf-end-month"></div>
+        <div class="wheel-column" id="pdf-end-day"></div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:20px;">
+      <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">导出内容</div>
+      <div style="display:flex; gap:10px;">
+        <button class="export-mode-btn active" id="pdf-mode-all" onclick="setPDFExportMode('all')">全部内容</button>
+        <button class="export-mode-btn" id="pdf-mode-text" onclick="setPDFExportMode('text')">仅文字</button>
+      </div>
+    </div>
+
+    <div style="background:var(--bg); border-radius:12px; padding:16px; margin-bottom:20px;">
+      <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">预览</div>
+      <div id="pdf-preview-container" style="background:#fff; border-radius:8px; padding:16px; min-height:100px; max-height:200px; overflow-y:auto; font-size:12px; line-height:1.6;"></div>
+    </div>
+
+    <button class="export-confirm-btn" onclick="confirmPDFExport()">确定导出</button>
   </div>
 </div>
 
@@ -2208,6 +2349,441 @@ function renderAndDownload(canvasContainer, month, year, callback) {
     console.error(err);
     showToast('导出失败');
     document.body.removeChild(canvasContainer);
+  });
+}
+
+// ===== 日期滚轮选择器 =====
+const datePickerStates = {
+  'txt-start': { year: 2026, month: 1, day: 1 },
+  'txt-end': { year: 2026, month: 12, day: 31 },
+  'pdf-start': { year: 2026, month: 1, day: 1 },
+  'pdf-end': { year: 2026, month: 12, day: 31 }
+};
+
+function initDateWheel(prefix, defaultDate) {
+  const yearCol = document.getElementById(`${prefix}-year`);
+  const monthCol = document.getElementById(`${prefix}-month`);
+  const dayCol = document.getElementById(`${prefix}-day`);
+  
+  if (!yearCol || !monthCol || !dayCol) return;
+  
+  // 设置初始值
+  datePickerStates[prefix] = {
+    year: defaultDate.getFullYear(),
+    month: defaultDate.getMonth() + 1,
+    day: defaultDate.getDate()
+  };
+  
+  // 生成年份选项 (2020-2030)
+  yearCol.innerHTML = '';
+  for (let y = 2020; y <= 2030; y++) {
+    const item = document.createElement('div');
+    item.className = 'wheel-item';
+    item.textContent = y + '年';
+    item.dataset.value = y;
+    if (y === datePickerStates[prefix].year) item.classList.add('selected');
+    yearCol.appendChild(item);
+  }
+  
+  // 生成月份选项
+  monthCol.innerHTML = '';
+  for (let m = 1; m <= 12; m++) {
+    const item = document.createElement('div');
+    item.className = 'wheel-item';
+    item.textContent = m + '月';
+    item.dataset.value = m;
+    if (m === datePickerStates[prefix].month) item.classList.add('selected');
+    monthCol.appendChild(item);
+  }
+  
+  // 生成日期选项
+  updateDayWheel(prefix);
+  
+  // 滚动到选中位置
+  scrollToSelected(yearCol);
+  scrollToSelected(monthCol);
+  scrollToSelected(dayCol);
+  
+  // 添加滚动监听
+  addWheelListener(yearCol, prefix, 'year');
+  addWheelListener(monthCol, prefix, 'month');
+  addWheelListener(dayCol, prefix, 'day');
+}
+
+function updateDayWheel(prefix) {
+  const dayCol = document.getElementById(`${prefix}-day`);
+  const state = datePickerStates[prefix];
+  const daysInMonth = new Date(state.year, state.month, 0).getDate();
+  
+  // 保存当前选中的日期
+  let currentDay = state.day;
+  if (currentDay > daysInMonth) currentDay = daysInMonth;
+  
+  dayCol.innerHTML = '';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const item = document.createElement('div');
+    item.className = 'wheel-item';
+    item.textContent = d + '日';
+    item.dataset.value = d;
+    if (d === currentDay) item.classList.add('selected');
+    dayCol.appendChild(item);
+  }
+  
+  state.day = currentDay;
+  scrollToSelected(dayCol);
+}
+
+function scrollToSelected(container) {
+  const selected = container.querySelector('.wheel-item.selected');
+  if (selected) {
+    const containerHeight = container.clientHeight;
+    const itemHeight = 40;
+    const scrollTop = selected.offsetTop - (containerHeight / 2) + (itemHeight / 2);
+    container.scrollTop = scrollTop;
+  }
+}
+
+function addWheelListener(container, prefix, type) {
+  let scrollTimeout;
+  
+  container.addEventListener('scroll', () => {
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      const containerHeight = container.clientHeight;
+      const scrollTop = container.scrollTop;
+      const itemHeight = 40;
+      const centerIndex = Math.round((scrollTop + containerHeight / 2 - itemHeight / 2) / itemHeight);
+      const items = container.querySelectorAll('.wheel-item');
+      
+      if (items[centerIndex]) {
+        // 更新选中状态
+        items.forEach(item => item.classList.remove('selected'));
+        items[centerIndex].classList.add('selected');
+        
+        // 更新状态
+        const value = parseInt(items[centerIndex].dataset.value);
+        datePickerStates[prefix][type] = value;
+        
+        // 如果修改了年或月，需要更新日期滚轮
+        if (type === 'year' || type === 'month') {
+          updateDayWheel(prefix);
+        }
+        
+        // 更新预览
+        if (prefix.startsWith('txt')) {
+          updateTXTPreview();
+        } else {
+          updatePDFPreview();
+        }
+      }
+    }, 100);
+  });
+}
+
+function getDateFromWheel(prefix) {
+  const state = datePickerStates[prefix];
+  return `${state.year}-${String(state.month).padStart(2, '0')}-${String(state.day).padStart(2, '0')}`;
+}
+
+// ===== TXT 导出 =====
+let txtExportMode = 'all';
+
+function openTXTExportSheet() {
+  closeExportSheet();
+  // 设置默认日期范围为当前月
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  
+  document.getElementById('txt-export-modal').classList.add('open');
+  
+  // 初始化滚轮
+  setTimeout(() => {
+    initDateWheel('txt-start', startOfMonth);
+    initDateWheel('txt-end', endOfMonth);
+    updateTXTPreview();
+  }, 100);
+}
+
+function closeTXTExportSheet(e) {
+  if (!e || e.target === document.getElementById('txt-export-modal')) {
+    document.getElementById('txt-export-modal').classList.remove('open');
+  }
+}
+
+function setTXTExportMode(mode) {
+  txtExportMode = mode;
+  document.getElementById('txt-mode-all').classList.toggle('active', mode === 'all');
+  document.getElementById('txt-mode-text').classList.toggle('active', mode === 'text');
+  updateTXTPreview();
+}
+
+function updateTXTPreview() {
+  const startDate = getDateFromWheel('txt-start');
+  const endDate = getDateFromWheel('txt-end');
+  const container = document.getElementById('txt-preview-container');
+  
+  if (!startDate || !endDate) {
+    container.textContent = '请选择日期范围';
+    return;
+  }
+  
+  const content = generateTXTContent(startDate, endDate, txtExportMode, true);
+  container.textContent = content || '该日期范围内没有日记内容';
+}
+
+function generateTXTContent(startDate, endDate, mode, isPreview) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  let content = '';
+  let count = 0;
+  const maxPreview = 3;
+  
+  const sortedDates = Object.keys(entries).sort();
+  
+  for (const dateStr of sortedDates) {
+    const entryDate = new Date(dateStr);
+    if (entryDate < start || entryDate > end) continue;
+    
+    const entry = entries[dateStr];
+    if (!entry || (!entry.text && !entry.mood && (!entry.photos || entry.photos.length === 0))) continue;
+    
+    if (isPreview && count >= maxPreview) {
+      content += '\n... (还有更多精彩内容)';
+      break;
+    }
+    
+    content += `\n${'='.repeat(40)}\n`;
+    content += `📅 ${dateStr}`;
+    
+    if (entry.mood && MOODS[entry.mood]) {
+      content += `  ${MOODS[entry.mood].emoji} ${MOODS[entry.mood].name}`;
+    }
+    content += '\n';
+    
+    if (entry.text) {
+      content += `\n${entry.text}\n`;
+    }
+    
+    if (mode === 'all' && entry.photos && entry.photos.length > 0) {
+      content += `\n[图片: ${entry.photos.length}张]\n`;
+    }
+    
+    count++;
+  }
+  
+  if (count === 0) {
+    return '';
+  }
+  
+  const header = `${'='.repeat(40)}\n📔 日记导出\n📅 ${startDate} 至 ${endDate}\n📝 共 ${count} 篇日记\n${'='.repeat(40)}\n`;
+  
+  return header + content + `\n${'='.repeat(40)}\n导出时间: ${new Date().toLocaleString()}\n`;
+}
+
+function confirmTXTExport() {
+  const startDate = getDateFromWheel('txt-start');
+  const endDate = getDateFromWheel('txt-end');
+  
+  if (!startDate || !endDate) {
+    showToast('请选择日期范围');
+    return;
+  }
+  
+  if (new Date(startDate) > new Date(endDate)) {
+    showToast('起始日期不能晚于结束日期');
+    return;
+  }
+  
+  const content = generateTXTContent(startDate, endDate, txtExportMode, false);
+  
+  if (!content) {
+    showToast('该日期范围内没有日记内容');
+    return;
+  }
+  
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const link = document.createElement('a');
+  link.download = `日记_${startDate}_${endDate}.txt`;
+  link.href = URL.createObjectURL(blob);
+  link.click();
+  
+  document.getElementById('txt-export-modal').classList.remove('open');
+  showToast('TXT 导出成功');
+}
+
+// ===== PDF 导出 =====
+let pdfExportMode = 'all';
+
+function openPDFExportSheet() {
+  closeExportSheet();
+  // 设置默认日期范围为当前月
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  
+  document.getElementById('pdf-export-modal').classList.add('open');
+  
+  // 初始化滚轮
+  setTimeout(() => {
+    initDateWheel('pdf-start', startOfMonth);
+    initDateWheel('pdf-end', endOfMonth);
+    updatePDFPreview();
+  }, 100);
+}
+
+function closePDFExportSheet(e) {
+  if (!e || e.target === document.getElementById('pdf-export-modal')) {
+    document.getElementById('pdf-export-modal').classList.remove('open');
+  }
+}
+
+function setPDFExportMode(mode) {
+  pdfExportMode = mode;
+  document.getElementById('pdf-mode-all').classList.toggle('active', mode === 'all');
+  document.getElementById('pdf-mode-text').classList.toggle('active', mode === 'text');
+  updatePDFPreview();
+}
+
+function updatePDFPreview() {
+  const startDate = getDateFromWheel('pdf-start');
+  const endDate = getDateFromWheel('pdf-end');
+  const container = document.getElementById('pdf-preview-container');
+  
+  if (!startDate || !endDate) {
+    container.innerHTML = '<div style="color:#888;">请选择日期范围</div>';
+    return;
+  }
+  
+  const html = generatePDFHTML(startDate, endDate, pdfExportMode, true);
+  container.innerHTML = html || '<div style="color:#888;">该日期范围内没有日记内容</div>';
+}
+
+function generatePDFHTML(startDate, endDate, mode, isPreview) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  let entriesHTML = '';
+  let count = 0;
+  const maxPreview = 2;
+  
+  const sortedDates = Object.keys(entries).sort();
+  
+  for (const dateStr of sortedDates) {
+    const entryDate = new Date(dateStr);
+    if (entryDate < start || entryDate > end) continue;
+    
+    const entry = entries[dateStr];
+    if (!entry || (!entry.text && !entry.mood && (!entry.photos || entry.photos.length === 0))) continue;
+    
+    if (isPreview && count >= maxPreview) break;
+    
+    const dateObj = new Date(dateStr);
+    const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][dateObj.getDay()];
+    
+    let moodHTML = '';
+    if (entry.mood && MOODS[entry.mood]) {
+      const mood = MOODS[entry.mood];
+      moodHTML = `<span style="display:inline-flex; align-items:center; gap:4px; background:${mood.hex}22; color:${mood.hex}; padding:2px 8px; border-radius:12px; font-size:12px;">${mood.emoji} ${mood.name}</span>`;
+    }
+    
+    let photosHTML = '';
+    if (mode === 'all' && entry.photos && entry.photos.length > 0) {
+      photosHTML = '<div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">';
+      const maxPhotos = isPreview ? 2 : entry.photos.length;
+      for (let i = 0; i < Math.min(entry.photos.length, maxPhotos); i++) {
+        photosHTML += `<img src="${entry.photos[i]}" style="width:80px; height:80px; object-fit:cover; border-radius:8px;">`;
+      }
+      if (entry.photos.length > maxPhotos && !isPreview) {
+        photosHTML += `<div style="width:80px; height:80px; background:#f5f5f5; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:12px; color:#888;">+${entry.photos.length - maxPhotos}</div>`;
+      }
+      photosHTML += '</div>';
+    }
+    
+    entriesHTML += `
+      <div style="margin-bottom:24px; padding-bottom:24px; border-bottom:1px solid #eee;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <span style="font-size:16px; font-weight:600;">${dateStr}</span>
+          <span style="font-size:12px; color:#888;">${weekday}</span>
+          ${moodHTML}
+        </div>
+        ${entry.text ? `<div style="font-size:14px; line-height:1.8; color:#333; white-space:pre-wrap;">${entry.text}</div>` : ''}
+        ${photosHTML}
+      </div>
+    `;
+    
+    count++;
+  }
+  
+  if (count === 0) {
+    return '';
+  }
+  
+  return `
+    <div style="font-family:'Courier','HuiwenMincho',serif;">
+      <div style="text-align:center; margin-bottom:24px; padding-bottom:16px; border-bottom:2px solid #1A1A1A;">
+        <div style="font-size:20px; font-weight:600; margin-bottom:4px;">📔 日记</div>
+        <div style="font-size:12px; color:#888;">${startDate} 至 ${endDate} · 共 ${count} 篇</div>
+      </div>
+      ${entriesHTML}
+    </div>
+  `;
+}
+
+function confirmPDFExport() {
+  const startDate = getDateFromWheel('pdf-start');
+  const endDate = getDateFromWheel('pdf-end');
+  
+  if (!startDate || !endDate) {
+    showToast('请选择日期范围');
+    return;
+  }
+  
+  if (new Date(startDate) > new Date(endDate)) {
+    showToast('起始日期不能晚于结束日期');
+    return;
+  }
+  
+  const html = generatePDFHTML(startDate, endDate, pdfExportMode, false);
+  
+  if (!html) {
+    showToast('该日期范围内没有日记内容');
+    return;
+  }
+  
+  // 使用 html2pdf.js 库
+  if (typeof html2pdf === 'undefined') {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js';
+    script.onload = () => generateAndDownloadPDF(html, startDate, endDate);
+    document.head.appendChild(script);
+  } else {
+    generateAndDownloadPDF(html, startDate, endDate);
+  }
+}
+
+function generateAndDownloadPDF(html, startDate, endDate) {
+  const element = document.createElement('div');
+  element.innerHTML = html;
+  element.style.padding = '40px';
+  element.style.background = '#fff';
+  document.body.appendChild(element);
+  
+  const opt = {
+    margin: 0,
+    filename: `日记_${startDate}_${endDate}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+  
+  html2pdf().set(opt).from(element).save().then(() => {
+    document.body.removeChild(element);
+    document.getElementById('pdf-export-modal').classList.remove('open');
+    showToast('PDF 导出成功');
+  }).catch(err => {
+    console.error(err);
+    document.body.removeChild(element);
+    showToast('PDF 导出失败');
   });
 }
 
