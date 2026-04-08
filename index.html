@@ -1008,16 +1008,8 @@ const MOODS = {
   angry:  { emoji:'😡', name:'愤怒', color:'var(--mood-angry)',  hex:'#EF476F' },
 };
 
-// 模拟数据（使用真实图片）
-let entries = {
-  '2026-04-04': { mood:'calm', text:'天气不错，拍了几张照片。', photos: ['photo1.jpg','photo2.jpg','photo3.jpg','photo1.jpg','photo2.jpg'] },
-  '2026-04-03': { mood:'happy', text:'和朋友去了公园，很开心。我们玩了一整天，吃了很多好吃的食物，还拍了很多照片。', photos: ['photo3.jpg','photo1.jpg','photo2.jpg','photo3.jpg'] },
-  '2026-04-02': { mood:'tired', text:'工作太忙了，累了一天。但是完成了很重要的项目，心里还是挺有成就感的。明天要好好休息一下。', photos: ['photo1.jpg','photo2.jpg','photo3.jpg'] },
-  '2026-04-01': { mood:'tired', text:'工作太忙了，累了一天。', photos: [] },
-  '2026-03-28': { mood:'sad', text:'今天心情不太好。', photos: ['photo2.jpg','photo1.jpg'] },
-  '2026-03-15': { mood:'happy', text:'莫断穿林打叶声，何妨吟啸且徐行。', photos: ['photo3.jpg','photo1.jpg'] },
-  '2026-03-16': { mood:'calm', text:'天气好极了。饿几乎没有。', photos: ['photo2.jpg','photo3.jpg'] },
-};
+// 日记数据（从 Firebase 加载，不再使用模拟数据）
+let entries = {};
 
 // ===== 状态 =====
 let currentYear = 2026;
