@@ -517,30 +517,7 @@
   .settings-row-right { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 12px; }
   .settings-arrow { color: #C0BDB8; font-size: 12px; }
 
-  /* 起始日切换按钮 */
-  .week-start-toggle {
-    display: flex;
-    background: var(--bg);
-    border-radius: 8px;
-    padding: 2px;
-    gap: 2px;
-  }
-  .week-start-btn {
-    padding: 6px 12px;
-    border: none;
-    background: transparent;
-    border-radius: 6px;
-    font-size: 13px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.2s;
-    font-family: inherit;
-  }
-  .week-start-btn.active {
-    background: #fff;
-    color: #1A1A1A;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  }
+
 
   /* toggle switch */
   .toggle {
@@ -840,16 +817,7 @@
       <span class="settings-arrow">›</span>
     </div>
 
-    <!-- 偏好 -->
-    <div class="settings-section">
-      <div class="settings-row">
-        <span class="settings-row-label">每周起始日</span>
-        <div class="week-start-toggle">
-          <button class="week-start-btn" id="weekstart-sun" onclick="setWeekStart('sunday')">周日</button>
-          <button class="week-start-btn active" id="weekstart-mon" onclick="setWeekStart('monday')">周一</button>
-        </div>
-      </div>
-    </div>
+
 
     <!-- 数据 -->
     <div class="settings-section">
@@ -1042,7 +1010,6 @@ let calView = 'photo'; // 'mood' | 'photo'
 let yearMode = 'photo'; // 'mood' | 'photo'
 let pageStack = ['page-home'];
 let editingDate = null;
-let weekStart = 'monday'; // 'monday' | 'sunday'，默认周一
 let newMood = null;
 let newPhotos = []; // 模拟图片（颜色数组）
 let selectedDate = null; // 选中的日期
@@ -1091,31 +1058,7 @@ function toggleSwitch(key) {
   }
 }
 
-// ===== 起始日选择 =====
-function setWeekStart(day) {
-  weekStart = day;
-  localStorage.setItem('weekStart', day);
-  updateWeekStartDisplay();
-  // 重新渲染月历
-  renderCalendar();
-}
 
-function updateWeekStartDisplay() {
-  // 更新按钮选中状态
-  const sunBtn = document.getElementById('weekstart-sun');
-  const monBtn = document.getElementById('weekstart-mon');
-  if (sunBtn) sunBtn.classList.toggle('active', weekStart === 'sunday');
-  if (monBtn) monBtn.classList.toggle('active', weekStart === 'monday');
-}
-
-// 页面加载时读取保存的设置
-function loadSettings() {
-  const saved = localStorage.getItem('weekStart');
-  if (saved) {
-    weekStart = saved;
-    updateWeekStartDisplay();
-  }
-}
 
 // ===== 首页渲染 =====
 async function loadEntriesFromFirebase() {
@@ -1152,22 +1095,11 @@ function renderCalendar() {
   const grid = document.getElementById('days-grid');
   const weekRow = document.getElementById('weekdays-row');
   grid.innerHTML = '';
-  
-  // 根据起始日设置显示星期标题
-  const weekdays = weekStart === 'sunday' ? WEEKDAYS_SUN : WEEKDAYS_MON;
-  weekRow.innerHTML = weekdays.map(d => `<div class="weekday">${d}</div>`).join('');
+  weekRow.innerHTML = WEEKDAYS_MON.map(d => `<div class="weekday">${d}</div>`).join('');
 
   const year = currentYear, month = currentMonth;
   const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
-  
-  // 根据起始日计算偏移量
-  let offset;
-  if (weekStart === 'sunday') {
-    offset = firstDay; // Sun-first
-  } else {
-    offset = firstDay === 0 ? 6 : firstDay - 1; // Mon-first
-  }
-  
+  const offset = firstDay === 0 ? 6 : firstDay - 1; // Mon-first
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   // 空白
@@ -2120,7 +2052,7 @@ function updatePreview() {
         const numStyle = hasEntry ? 'color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'color:var(--text-primary);';
         return `<div style="aspect-ratio:1; border-radius:6px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:11px; font-family:'Courier','HuiwenMincho',serif; position:relative; overflow:hidden;">
           <span style="${cellStyle}; ${numStyle}; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:3; line-height:1;">${d}</span>
-          ${hasEntry ? (jpgExportMode === 'mood' && entry.mood ? `<div style="position:absolute; width:50%; height:50%; opacity:0.4; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1;"><img src="${{happy:'mood_happy.png',calm:'mood_calm.png',tired:'mood_tired.png',sad:'mood_sad.png',angry:'mood_angry.png'}[entry.mood]}" style="width:100%;height:100%;object-fit:contain;"></div>` : (entry.photos && entry.photos.length > 0 ? `<div style="position:absolute; inset:0; z-index:1; border-radius:6px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : '')) : ''}
+          ${hasEntry ? (jpgExportMode === 'mood' && entry.mood ? `<div style="position:absolute; width:50%; height:50%; opacity:0.4; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1;"><img src="${{happy:'mood_happy.png',calm:'mood_calm.png',tired:'mood_tired.png',sad:'mood_sad.png',angry:'mood_angry.png'}[entry.mood]}" style="width:100%;height:100%;object-fit:contain;"></div>` : (jpgExportMode === 'photo' && entry.photos && entry.photos.length > 0 ? `<div style="position:absolute; inset:0; z-index:1; border-radius:6px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : '')) : ''}
         </div>`;
       }).join('')}
     </div>
@@ -2178,7 +2110,7 @@ function confirmJPGExport() {
         const numStyle = hasEntry ? 'color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'color:var(--text-primary);';
         return `<div style="aspect-ratio:1; border-radius:8px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:16px; font-family:'Courier','HuiwenMincho',serif; position:relative; overflow:hidden;">
           <span style="${cellStyle}; ${numStyle}; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:3; line-height:1;">${d}</span>
-          ${hasEntry ? (jpgExportMode === 'mood' && entry.mood ? `<div style="position:absolute; width:60%; height:60%; opacity:0.5; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1;"><img src="${{happy:'mood_happy.png',calm:'mood_calm.png',tired:'mood_tired.png',sad:'mood_sad.png',angry:'mood_angry.png'}[entry.mood]}" style="width:100%;height:100%;object-fit:contain;"></div>` : (entry.photos && entry.photos.length > 0 ? `<div style="position:absolute; inset:0; z-index:1; border-radius:8px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : '')) : ''}
+          ${hasEntry ? (jpgExportMode === 'mood' && entry.mood ? `<div style="position:absolute; width:60%; height:60%; opacity:0.5; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1;"><img src="${{happy:'mood_happy.png',calm:'mood_calm.png',tired:'mood_tired.png',sad:'mood_sad.png',angry:'mood_angry.png'}[entry.mood]}" style="width:100%;height:100%;object-fit:contain;"></div>` : (jpgExportMode === 'photo' && entry.photos && entry.photos.length > 0 ? `<div style="position:absolute; inset:0; z-index:1; border-radius:8px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : '')) : ''}
         </div>`;
       }).join('')}
     </div>
