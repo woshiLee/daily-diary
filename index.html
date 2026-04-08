@@ -1060,9 +1060,55 @@ function toggleSwitch(key) {
 
 
 
+// ===== 测试数据 =====
+const TEST_DATA = [
+  // 只有文字
+  { date: '2026-04-01', text: '今天天气不错，去公园散步了。', mood: null, photos: [] },
+  // 只有心情
+  { date: '2026-04-02', text: '', mood: 'happy', photos: [] },
+  // 只有图片
+  { date: '2026-04-03', text: '', mood: null, photos: ['https://picsum.photos/400/400?random=1'] },
+  // 文字+心情
+  { date: '2026-04-05', text: '工作很顺利，心情很好！', mood: 'calm', photos: [] },
+  // 文字+图片
+  { date: '2026-04-07', text: '今天的晚餐很美味。', mood: null, photos: ['https://picsum.photos/400/400?random=2'] },
+  // 心情+图片
+  { date: '2026-04-08', text: '', mood: 'tired', photos: ['https://picsum.photos/400/400?random=3'] },
+  // 文字+心情+图片（完整记录）
+  { date: '2026-04-09', text: '今天有点累，但是看到了很美的夕阳。', mood: 'sad', photos: ['https://picsum.photos/400/400?random=4'] },
+  // 另一个完整记录
+  { date: '2026-04-10', text: '周末和朋友聚会，玩得很开心！', mood: 'happy', photos: ['https://picsum.photos/400/400?random=5'] },
+  // 愤怒心情
+  { date: '2026-04-11', text: '遇到了一些烦心事。', mood: 'angry', photos: [] },
+  // 多图记录
+  { date: '2026-04-12', text: '今天拍了很多照片。', mood: 'calm', photos: ['https://picsum.photos/400/400?random=6', 'https://picsum.photos/400/400?random=7'] },
+];
+
+// ===== 初始化测试数据 =====
+async function initTestData() {
+  try {
+    const { db, collection, getDocs, doc, setDoc } = window.firebaseApp;
+    const querySnapshot = await getDocs(collection(db, 'entries'));
+    
+    // 如果数据库为空，写入测试数据
+    if (querySnapshot.empty) {
+      console.log('数据库为空，写入测试数据...');
+      for (const item of TEST_DATA) {
+        await setDoc(doc(db, 'entries', item.date), item);
+      }
+      console.log('测试数据写入完成');
+    }
+  } catch (error) {
+    console.error('初始化测试数据失败:', error);
+  }
+}
+
 // ===== 首页渲染 =====
 async function loadEntriesFromFirebase() {
   try {
+    // 先初始化测试数据（如果数据库为空）
+    await initTestData();
+    
     const { db, collection, getDocs } = window.firebaseApp;
     const querySnapshot = await getDocs(collection(db, 'entries'));
     entries = {};
@@ -1079,7 +1125,6 @@ async function loadEntriesFromFirebase() {
     renderHome();
   } catch (error) {
     console.error('加载数据失败:', error);
-    // 如果失败，使用模拟数据
   }
 }
 
