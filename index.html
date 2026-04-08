@@ -817,13 +817,9 @@
 
     <!-- 偏好 -->
     <div class="settings-section">
-      <div class="settings-row" onclick="showToast('主题设置开发中')">
-        <span class="settings-row-label">主题</span>
-        <div class="settings-row-right">浅色 <span class="settings-arrow">›</span></div>
-      </div>
-      <div class="settings-row" onclick="showToast('每周起始日设置开发中')">
+      <div class="settings-row" onclick="openWeekStartPicker()">
         <span class="settings-row-label">每周起始日</span>
-        <div class="settings-row-right">周一 <span class="settings-arrow">›</span></div>
+        <div class="settings-row-right" id="week-start-display">周一 <span class="settings-arrow">›</span></div>
       </div>
     </div>
 
@@ -985,6 +981,30 @@
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+<!-- ==================== 起始日选择弹窗 ==================== -->
+<div class="modal-overlay" id="weekstart-modal" onclick="closeWeekStartPicker(event)">
+  <div class="modal-sheet">
+    <div class="modal-title">每周起始日</div>
+    <div class="modal-sub">选择一周从哪天开始</div>
+    <div class="export-option" onclick="setWeekStart('monday')">
+      <div class="export-icon">📅</div>
+      <div class="export-info">
+        <div class="export-name">周一</div>
+        <div class="export-desc">周一到周日</div>
+      </div>
+      <div id="weekstart-check-monday" style="color:#34C759; font-size:18px;">✓</div>
+    </div>
+    <div class="export-option" onclick="setWeekStart('sunday')">
+      <div class="export-icon">📅</div>
+      <div class="export-info">
+        <div class="export-name">周日</div>
+        <div class="export-desc">周日到周六</div>
+      </div>
+      <div id="weekstart-check-sunday" style="color:#34C759; font-size:18px; display:none;">✓</div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ===== PWA Service Worker 注册 =====
 if ('serviceWorker' in navigator) {
@@ -1018,6 +1038,7 @@ let calView = 'photo'; // 'mood' | 'photo'
 let yearMode = 'photo'; // 'mood' | 'photo'
 let pageStack = ['page-home'];
 let editingDate = null;
+let weekStart = 'monday'; // 'monday' | 'sunday'，默认周一
 let newMood = null;
 let newPhotos = []; // 模拟图片（颜色数组）
 let selectedDate = null; // 选中的日期
@@ -1025,6 +1046,7 @@ let selectedDate = null; // 选中的日期
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const CN_MONTH_NAMES = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
 const WEEKDAYS_MON = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const WEEKDAYS_SUN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const CN_WEEKDAYS = ['周一','周二','周三','周四','周五','周六','周日'];
 const TODAY = new Date();
 
@@ -1065,6 +1087,51 @@ function toggleSwitch(key) {
   }
 }
 
+// ===== 起始日选择 =====
+function openWeekStartPicker() {
+  document.getElementById('weekstart-modal').classList.add('open');
+  updateWeekStartDisplay();
+}
+
+function closeWeekStartPicker(e) {
+  if (e.target.id === 'weekstart-modal') {
+    document.getElementById('weekstart-modal').classList.remove('open');
+  }
+}
+
+function setWeekStart(day) {
+  weekStart = day;
+  localStorage.setItem('weekStart', day);
+  updateWeekStartDisplay();
+  document.getElementById('weekstart-modal').classList.remove('open');
+  showToast(day === 'monday' ? '已设置为周一' : '已设置为周日');
+  // 重新渲染月历
+  renderCalendar();
+}
+
+function updateWeekStartDisplay() {
+  // 更新弹窗内的选中状态
+  const mondayCheck = document.getElementById('weekstart-check-monday');
+  const sundayCheck = document.getElementById('weekstart-check-sunday');
+  if (mondayCheck) mondayCheck.style.display = weekStart === 'monday' ? 'block' : 'none';
+  if (sundayCheck) sundayCheck.style.display = weekStart === 'sunday' ? 'block' : 'none';
+  
+  // 更新设置页面的显示
+  const display = document.getElementById('week-start-display');
+  if (display) {
+    display.innerHTML = (weekStart === 'monday' ? '周一' : '周日') + ' <span class="settings-arrow">›</span>';
+  }
+}
+
+// 页面加载时读取保存的设置
+function loadSettings() {
+  const saved = localStorage.getItem('weekStart');
+  if (saved) {
+    weekStart = saved;
+    updateWeekStartDisplay();
+  }
+}
+
 // ===== 首页渲染 =====
 async function loadEntriesFromFirebase() {
   try {
@@ -1100,11 +1167,22 @@ function renderCalendar() {
   const grid = document.getElementById('days-grid');
   const weekRow = document.getElementById('weekdays-row');
   grid.innerHTML = '';
-  weekRow.innerHTML = WEEKDAYS_MON.map(d => `<div class="weekday">${d}</div>`).join('');
+  
+  // 根据起始日设置显示星期标题
+  const weekdays = weekStart === 'sunday' ? WEEKDAYS_SUN : WEEKDAYS_MON;
+  weekRow.innerHTML = weekdays.map(d => `<div class="weekday">${d}</div>`).join('');
 
   const year = currentYear, month = currentMonth;
   const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
-  const offset = firstDay === 0 ? 6 : firstDay - 1; // Mon-first
+  
+  // 根据起始日计算偏移量
+  let offset;
+  if (weekStart === 'sunday') {
+    offset = firstDay; // Sun-first
+  } else {
+    offset = firstDay === 0 ? 6 : firstDay - 1; // Mon-first
+  }
+  
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   // 空白
@@ -2174,6 +2252,8 @@ toggleCalViewIcon();
 function initFirebase() {
   loadEntriesFromFirebase();
 }
+// 页面加载时初始化
+loadSettings();
 if (window.firebaseReady) {
   initFirebase();
 } else {
