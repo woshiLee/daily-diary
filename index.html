@@ -1329,11 +1329,14 @@ function renderCalendar() {
         // 心情模式：显示心情图片
         if (entry.mood) {
           cell.classList.add('mood-cell');
-          const moodImgMap = { happy: 'mood_happy.png', calm: 'mood_calm.png', tired: 'mood_tired.png', sad: 'mood_sad.png', angry: 'mood_angry.png' };
-          const img = document.createElement('img');
-          img.className = 'mood-img';
-          img.src = moodImgMap[entry.mood] || 'mood_happy.png';
-          cell.appendChild(img);
+          cell.style.backgroundColor = MOODS[entry.mood].hex;
+          // 根据背景亮度调整文字颜色
+          const darkMoods = ['calm', 'angry'];
+          if (darkMoods.includes(entry.mood)) {
+            num.style.color = '#fff';
+          } else {
+            num.style.color = '#1A1A1A';
+          }
         }
       } else {
         // 图片模式：显示图片缩略图或文字指示
