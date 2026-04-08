@@ -2248,10 +2248,11 @@ function updatePreview() {
         const cellStyle = isFuture ? 'opacity:0.3' : (isToday ? 'font-weight:700;' : '');
         const hasEntry = entry && !isFuture;
         const hasPhoto = hasEntry && jpgExportMode === 'photo' && entry.photos && entry.photos.length > 0;
-        const numStyle = hasPhoto ? 'color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'color:var(--text-primary);';
-        return `<div style="aspect-ratio:1; border-radius:6px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:11px; font-family:'Courier','HuiwenMincho',serif; position:relative; overflow:hidden;">
+        const moodBg = hasEntry && jpgExportMode === 'mood' && entry.mood ? MOODS[entry.mood].hex : 'var(--bg)';
+        const numStyle = hasPhoto ? 'color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'color:#1A1A1A;';
+        return `<div style="aspect-ratio:1; border-radius:6px; background:${moodBg}; display:flex; align-items:center; justify-content:center; font-size:11px; font-family:'Courier','HuiwenMincho',serif; position:relative; overflow:hidden;">
           <span style="${cellStyle}; ${numStyle}; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:3; line-height:1;">${d}</span>
-          ${hasEntry ? (jpgExportMode === 'mood' && entry.mood ? `<div style="position:absolute; width:50%; height:50%; opacity:0.4; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1;"><img src="${{happy:'mood_happy.png',calm:'mood_calm.png',tired:'mood_tired.png',sad:'mood_sad.png',angry:'mood_angry.png'}[entry.mood]}" style="width:100%;height:100%;object-fit:contain;"></div>` : (hasPhoto ? `<div style="position:absolute; inset:0; z-index:1; border-radius:6px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : '')) : ''}
+          ${hasPhoto ? `<div style="position:absolute; inset:0; z-index:1; border-radius:6px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : ''}
         </div>`;
       }).join('')}
     </div>
@@ -2307,10 +2308,11 @@ function confirmJPGExport() {
         const cellStyle = isFuture ? 'opacity:0.3' : (isToday ? 'font-weight:700;' : '');
         const hasEntry = entry && !isFuture;
         const hasPhoto = hasEntry && jpgExportMode === 'photo' && entry.photos && entry.photos.length > 0;
-        const numStyle = hasPhoto ? 'color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'color:var(--text-primary);';
-        return `<div style="aspect-ratio:1; border-radius:8px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:16px; font-family:'Courier','HuiwenMincho',serif; position:relative; overflow:hidden;">
+        const moodBg = hasEntry && jpgExportMode === 'mood' && entry.mood ? MOODS[entry.mood].hex : 'var(--bg)';
+        const numStyle = hasPhoto ? 'color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'color:#1A1A1A;';
+        return `<div style="aspect-ratio:1; border-radius:8px; background:${moodBg}; display:flex; align-items:center; justify-content:center; font-size:16px; font-family:'Courier','HuiwenMincho',serif; position:relative; overflow:hidden;">
           <span style="${cellStyle}; ${numStyle}; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:3; line-height:1;">${d}</span>
-          ${hasEntry ? (jpgExportMode === 'mood' && entry.mood ? `<div style="position:absolute; width:60%; height:60%; opacity:0.5; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1;"><img src="${{happy:'mood_happy.png',calm:'mood_calm.png',tired:'mood_tired.png',sad:'mood_sad.png',angry:'mood_angry.png'}[entry.mood]}" style="width:100%;height:100%;object-fit:contain;"></div>` : (hasPhoto ? `<div style="position:absolute; inset:0; z-index:1; border-radius:8px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : '')) : ''}
+          ${hasPhoto ? `<div style="position:absolute; inset:0; z-index:1; border-radius:8px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : ''}
         </div>`;
       }).join('')}
     </div>
