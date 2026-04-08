@@ -1524,10 +1524,16 @@ async function saveEntry() {
       const photo = newPhotos[i];
       if (photo instanceof File) {
         // 新上传的文件，上传到 Storage
-        const storageRef = ref(storage, `photos/${editingDate}/${Date.now()}_${i}.jpg`);
-        await uploadBytes(storageRef, photo);
-        const url = await getDownloadURL(storageRef);
-        photoUrls.push(url);
+        try {
+          const storageRef = ref(storage, `photos/${editingDate}/${Date.now()}_${i}.jpg`);
+          await uploadBytes(storageRef, photo);
+          const url = await getDownloadURL(storageRef);
+          photoUrls.push(url);
+        } catch (uploadError) {
+          console.error('图片上传失败:', uploadError);
+          showToast('图片上传失败，将只保存文字');
+          // 继续保存，只是没有这张图片
+        }
       } else if (typeof photo === 'string' && photo.startsWith('http')) {
         // 已有的 URL，直接保留
         photoUrls.push(photo);
