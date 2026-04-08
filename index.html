@@ -1062,26 +1062,39 @@ function toggleSwitch(key) {
 
 // ===== 测试数据 =====
 const TEST_DATA = [
+  // ===== 三月数据 =====
   // 只有文字
-  { date: '2026-04-01', text: '今天天气不错，去公园散步了。', mood: null, photos: [] },
+  { date: '2026-03-05', text: '今天去图书馆借了几本书。', mood: null, photos: [] },
   // 只有心情
-  { date: '2026-04-02', text: '', mood: 'happy', photos: [] },
+  { date: '2026-03-08', text: '', mood: 'happy', photos: [] },
   // 只有图片
-  { date: '2026-04-03', text: '', mood: null, photos: ['https://picsum.photos/400/400?random=1'] },
+  { date: '2026-03-12', text: '', mood: null, photos: ['https://picsum.photos/400/400?random=10'] },
   // 文字+心情
-  { date: '2026-04-05', text: '工作很顺利，心情很好！', mood: 'calm', photos: [] },
+  { date: '2026-03-15', text: '今天工作很顺利，心情不错。', mood: 'calm', photos: [] },
   // 文字+图片
-  { date: '2026-04-07', text: '今天的晚餐很美味。', mood: null, photos: ['https://picsum.photos/400/400?random=2'] },
+  { date: '2026-03-18', text: '午餐时间拍的。', mood: null, photos: ['https://picsum.photos/400/400?random=11'] },
   // 心情+图片
-  { date: '2026-04-08', text: '', mood: 'tired', photos: ['https://picsum.photos/400/400?random=3'] },
-  // 文字+心情+图片（完整记录）
-  { date: '2026-04-09', text: '今天有点累，但是看到了很美的夕阳。', mood: 'sad', photos: ['https://picsum.photos/400/400?random=4'] },
-  // 另一个完整记录
-  { date: '2026-04-10', text: '周末和朋友聚会，玩得很开心！', mood: 'happy', photos: ['https://picsum.photos/400/400?random=5'] },
-  // 愤怒心情
-  { date: '2026-04-11', text: '遇到了一些烦心事。', mood: 'angry', photos: [] },
-  // 多图记录
-  { date: '2026-04-12', text: '今天拍了很多照片。', mood: 'calm', photos: ['https://picsum.photos/400/400?random=6', 'https://picsum.photos/400/400?random=7'] },
+  { date: '2026-03-20', text: '', mood: 'tired', photos: ['https://picsum.photos/400/400?random=12'] },
+  // 完整记录
+  { date: '2026-03-25', text: '今天有点累，但是完成了重要任务。', mood: 'sad', photos: ['https://picsum.photos/400/400?random=13'] },
+  // 愤怒
+  { date: '2026-03-28', text: '遇到了不讲理的人。', mood: 'angry', photos: [] },
+  // 多图
+  { date: '2026-03-30', text: '周末出游记录。', mood: 'happy', photos: ['https://picsum.photos/400/400?random=14', 'https://picsum.photos/400/400?random=15'] },
+  
+  // ===== 四月数据 =====
+  // 只有文字
+  { date: '2026-04-02', text: '今天天气很好，适合出门。', mood: null, photos: [] },
+  // 只有心情
+  { date: '2026-04-04', text: '', mood: 'calm', photos: [] },
+  // 只有图片
+  { date: '2026-04-05', text: '', mood: null, photos: ['https://picsum.photos/400/400?random=20'] },
+  // 文字+心情
+  { date: '2026-04-06', text: '今天心情很平静。', mood: 'calm', photos: [] },
+  // 文字+图片
+  { date: '2026-04-07', text: '今天的晚餐。', mood: null, photos: ['https://picsum.photos/400/400?random=21'] },
+  // 心情+图片
+  { date: '2026-04-08', text: '', mood: 'happy', photos: ['https://picsum.photos/400/400?random=22'] },
 ];
 
 // ===== 初始化测试数据 =====
@@ -1170,7 +1183,7 @@ function renderCalendar() {
     num.textContent = d;
     cell.appendChild(num);
 
-    if (entry) {
+    if (entry && !isFuture) {
       if (calView === 'mood') {
         // 心情模式：显示心情图片
         if (entry.mood) {
@@ -1196,7 +1209,9 @@ function renderCalendar() {
       }
     }
 
-    cell.onclick = () => selectDate(dateStr, d);
+    if (!isFuture) {
+      cell.onclick = () => selectDate(dateStr, d);
+    }
     grid.appendChild(cell);
   }
 }
