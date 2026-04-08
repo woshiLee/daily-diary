@@ -232,7 +232,7 @@
     line-height: 1;
     font-family: 'Courier', 'HuiwenMincho', serif !important;
   }
-  .day-cell.has-entry .day-num { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+  .day-cell.has-photo .day-num { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
 
   /* 心情模式 */
   .day-cell.mood-cell .mood-img {
@@ -1184,6 +1184,7 @@ function renderCalendar() {
       } else {
         // 图片模式：显示图片缩略图或文字指示
         if (entry.photos && entry.photos.length > 0) {
+          cell.classList.add('has-photo');
           const img = document.createElement('img');
           img.className = 'thumb-img';
           img.src = entry.photos[0];
@@ -2094,10 +2095,11 @@ function updatePreview() {
         const isFuture = new Date(year, previewMonth, d) > TODAY;
         const cellStyle = isFuture ? 'opacity:0.3' : (isToday ? 'font-weight:700;' : '');
         const hasEntry = entry && !isFuture;
-        const numStyle = hasEntry ? 'color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'color:var(--text-primary);';
+        const hasPhoto = hasEntry && jpgExportMode === 'photo' && entry.photos && entry.photos.length > 0;
+        const numStyle = hasPhoto ? 'color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'color:var(--text-primary);';
         return `<div style="aspect-ratio:1; border-radius:6px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:11px; font-family:'Courier','HuiwenMincho',serif; position:relative; overflow:hidden;">
           <span style="${cellStyle}; ${numStyle}; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:3; line-height:1;">${d}</span>
-          ${hasEntry ? (jpgExportMode === 'mood' && entry.mood ? `<div style="position:absolute; width:50%; height:50%; opacity:0.4; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1;"><img src="${{happy:'mood_happy.png',calm:'mood_calm.png',tired:'mood_tired.png',sad:'mood_sad.png',angry:'mood_angry.png'}[entry.mood]}" style="width:100%;height:100%;object-fit:contain;"></div>` : (jpgExportMode === 'photo' && entry.photos && entry.photos.length > 0 ? `<div style="position:absolute; inset:0; z-index:1; border-radius:6px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : '')) : ''}
+          ${hasEntry ? (jpgExportMode === 'mood' && entry.mood ? `<div style="position:absolute; width:50%; height:50%; opacity:0.4; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1;"><img src="${{happy:'mood_happy.png',calm:'mood_calm.png',tired:'mood_tired.png',sad:'mood_sad.png',angry:'mood_angry.png'}[entry.mood]}" style="width:100%;height:100%;object-fit:contain;"></div>` : (hasPhoto ? `<div style="position:absolute; inset:0; z-index:1; border-radius:6px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : '')) : ''}
         </div>`;
       }).join('')}
     </div>
@@ -2152,10 +2154,11 @@ function confirmJPGExport() {
         const isFuture = new Date(year, monthIdx, d) > TODAY;
         const cellStyle = isFuture ? 'opacity:0.3' : (isToday ? 'font-weight:700;' : '');
         const hasEntry = entry && !isFuture;
-        const numStyle = hasEntry ? 'color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'color:var(--text-primary);';
+        const hasPhoto = hasEntry && jpgExportMode === 'photo' && entry.photos && entry.photos.length > 0;
+        const numStyle = hasPhoto ? 'color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'color:var(--text-primary);';
         return `<div style="aspect-ratio:1; border-radius:8px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:16px; font-family:'Courier','HuiwenMincho',serif; position:relative; overflow:hidden;">
           <span style="${cellStyle}; ${numStyle}; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:3; line-height:1;">${d}</span>
-          ${hasEntry ? (jpgExportMode === 'mood' && entry.mood ? `<div style="position:absolute; width:60%; height:60%; opacity:0.5; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1;"><img src="${{happy:'mood_happy.png',calm:'mood_calm.png',tired:'mood_tired.png',sad:'mood_sad.png',angry:'mood_angry.png'}[entry.mood]}" style="width:100%;height:100%;object-fit:contain;"></div>` : (jpgExportMode === 'photo' && entry.photos && entry.photos.length > 0 ? `<div style="position:absolute; inset:0; z-index:1; border-radius:8px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : '')) : ''}
+          ${hasEntry ? (jpgExportMode === 'mood' && entry.mood ? `<div style="position:absolute; width:60%; height:60%; opacity:0.5; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1;"><img src="${{happy:'mood_happy.png',calm:'mood_calm.png',tired:'mood_tired.png',sad:'mood_sad.png',angry:'mood_angry.png'}[entry.mood]}" style="width:100%;height:100%;object-fit:contain;"></div>` : (hasPhoto ? `<div style="position:absolute; inset:0; z-index:1; border-radius:8px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : '')) : ''}
         </div>`;
       }).join('')}
     </div>
