@@ -274,6 +274,13 @@
     font-size: 13px; color: var(--text-secondary);
     margin-bottom: 12px; font-weight: 400;
   }
+  /* 日记列表滑动容器 */
+  .entry-swipe-wrap {
+    position: relative;
+    margin-bottom: 12px;
+    overflow: hidden;
+    border-radius: var(--radius);
+  }
   .entry-card {
     background: var(--card-bg);
     border-radius: var(--radius);
@@ -281,9 +288,32 @@
     cursor: pointer;
     display: flex; gap: 12px; align-items: center;
     position: relative;
-    margin-bottom: 12px;
+    transition: transform 0.25s ease-out;
+    z-index: 2;
+  }
+  .entry-card.swiped-left {
+    transform: translateX(-70px);
   }
   .entry-card:active { background-color: var(--border); }
+  .entry-delete-btn {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 70px;
+    background: #FF3B30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    cursor: pointer;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .entry-delete-btn svg {
+    width: 24px;
+    height: 24px;
+    stroke: #fff;
+  }
   .entry-date-col { min-width: 50px; text-align: center; }
   .entry-day-num { font-size: 18px; font-weight: 700; line-height: 1; font-family: 'Courier', 'HuiwenMincho', serif !important; }
   .entry-weekday { font-size: 8px; color: var(--text-secondary); margin-top: 2px; font-family: 'Courier', 'HuiwenMincho', serif !important; }
@@ -1447,10 +1477,15 @@ function renderEntriesList() {
     const wd = weekDayNames[dt.getDay()];
     const mood = MOODS[entry.mood];
 
+    // 创建滑动容器
+    const swipeWrap = document.createElement('div');
+    swipeWrap.className = 'entry-swipe-wrap';
+    
     // 卡片内容
     const card = document.createElement('div');
     card.className = 'entry-card';
     card.setAttribute('data-date', dateStr);
+    card.id = `entry-card-${dateStr}`;
     
     const thumbsHTML = (entry.photos || []).slice(0,3).map(p =>
       `<img class="entry-thumb" src="${p}">`
@@ -1469,9 +1504,38 @@ function renderEntriesList() {
     `;
     
     // 点击卡片打开详情
-    card.onclick = () => openDetail(dateStr);
+    card.onclick = (e) => {
+      // 如果已经滑动显示删除按钮，点击时先关闭
+      if (card.classList.contains('swiped-left')) {
+        card.classList.remove('swiped-left');
+        e.stopPropagation();
+        return;
+      }
+      openDetail(dateStr);
+    };
     
-    container.appendChild(card);
+    // 删除按钮
+    const deleteBtn = document.createElement('div');
+    deleteBtn.className = 'entry-delete-btn';
+    deleteBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+    `;
+    deleteBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (confirm('确定要删除这篇日记吗？')) {
+        deleteEntry(dateStr);
+      }
+    };
+    
+    swipeWrap.appendChild(card);
+    swipeWrap.appendChild(deleteBtn);
+    container.appendChild(swipeWrap);
+    
+    // 绑定滑动事件
+    bindEntrySwipe(card, dateStr);
   });
 }
 
@@ -2204,6 +2268,80 @@ async function deleteCurrentEntry() {
 
 function editCurrentEntry() {
   if (window._detailDateStr) openNew(window._detailDateStr);
+}
+
+// 删除指定日期的日记
+async function deleteEntry(dateStr) {
+  showToast('正在删除...');
+  
+  try {
+    // 从 Firebase 删除
+    if (window.firebaseApp && window.firebaseApp.db) {
+      const { db, collection, query, where, getDocs, deleteDoc, doc } = window.firebaseApp;
+      const q = query(collection(db, 'entries'), where('date', '==', dateStr));
+      const querySnapshot = await getDocs(q);
+      
+      for (const docSnapshot of querySnapshot.docs) {
+        await deleteDoc(doc(db, 'entries', docSnapshot.id));
+      }
+    }
+    
+    // 从本地数据中删除
+    delete entries[dateStr];
+    
+    // 刷新列表和日历
+    renderCalendar();
+    renderEntriesList();
+    
+    showToast('日记已删除');
+  } catch (error) {
+    console.error('删除失败:', error);
+    showToast('删除失败，请重试');
+  }
+}
+
+// 绑定日记卡片的左滑事件
+function bindEntrySwipe(card, dateStr) {
+  let startX = 0;
+  let currentX = 0;
+  let isDragging = false;
+  
+  card.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX;
+    isDragging = true;
+  }, { passive: true });
+  
+  card.addEventListener('touchmove', (e) => {
+    if (!isDragging) return;
+    currentX = e.touches[0].clientX;
+    const diff = startX - currentX;
+    
+    // 左滑（从右向左）显示删除按钮
+    if (diff > 0 && diff < 80) {
+      card.style.transform = `translateX(-${diff}px)`;
+    }
+  }, { passive: true });
+  
+  card.addEventListener('touchend', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    
+    const diff = startX - currentX;
+    card.style.transform = '';
+    
+    if (diff > 40) {
+      // 滑动超过阈值，显示删除按钮
+      card.classList.add('swiped-left');
+    } else {
+      // 恢复原位
+      card.classList.remove('swiped-left');
+    }
+  });
+  
+  card.addEventListener('touchcancel', () => {
+    isDragging = false;
+    card.style.transform = '';
+  });
 }
 
 // ===== 导出弹窗 =====
