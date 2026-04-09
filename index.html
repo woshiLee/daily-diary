@@ -1307,14 +1307,13 @@ const TEST_DATA = [
 // ===== 初始化测试数据 =====
 async function initTestData() {
   try {
-    const { db, collection, getDocs, doc, setDoc } = window.firebaseApp;
-    const querySnapshot = await getDocs(collection(db, 'entries'));
+    const querySnapshot = await db.collection('entries').get();
     
     // 如果数据库为空，写入测试数据
     if (querySnapshot.empty) {
       console.log('数据库为空，写入测试数据...');
       for (const item of TEST_DATA) {
-        await setDoc(doc(db, 'entries', item.date), item);
+        await db.collection('entries').doc(item.date).set(item);
       }
       console.log('测试数据写入完成');
     }
@@ -1329,8 +1328,7 @@ async function loadEntriesFromFirebase() {
     // 先初始化测试数据（如果数据库为空）
     await initTestData();
     
-    const { db, collection, getDocs } = window.firebaseApp;
-    const querySnapshot = await getDocs(collection(db, 'entries'));
+    const querySnapshot = await db.collection('entries').get();
     entries = {};
     querySnapshot.forEach((doc) => {
       const data = doc.data();
@@ -2021,9 +2019,7 @@ async function saveEntry() {
   }, 15000);
 
   try {
-    const { db, setDoc, doc } = window.firebaseApp;
-    
-    console.log('Firebase 已连接，db:', !!db, 'setDoc:', !!setDoc, 'doc:', !!doc);
+    console.log('Firebase 已连接，db:', !!db);
 
     // 正确处理照片
     const photoUrls = [];
@@ -2090,9 +2086,7 @@ async function saveEntry() {
     console.log('使用 setDoc 直接保存...');
     
     // 直接使用 setDoc，用日期作为文档 ID，避免查询
-    const docRef = doc(db, 'entries', editingDate);
-    console.log('docRef 创建成功:', docRef.id);
-    await setDoc(docRef, entryData, { merge: true });
+    await db.collection('entries').doc(editingDate).set(entryData, { merge: true });
     console.log('setDoc 调用成功');
 
     // 更新本地数据
@@ -2242,12 +2236,10 @@ async function deleteCurrentEntry() {
   try {
     // 从 Firebase 删除
     if (window.firebaseApp && window.firebaseApp.db) {
-      const { db, collection, query, where, getDocs, deleteDoc, doc } = window.firebaseApp;
-      const q = query(collection(db, 'entries'), where('date', '==', dateStr));
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await db.collection('entries').where('date', '==', dateStr).get();
       
       for (const docSnapshot of querySnapshot.docs) {
-        await deleteDoc(doc(db, 'entries', docSnapshot.id));
+        await docSnapshot.ref.delete();
       }
     }
     
@@ -2277,12 +2269,10 @@ async function deleteEntry(dateStr) {
   try {
     // 从 Firebase 删除
     if (window.firebaseApp && window.firebaseApp.db) {
-      const { db, collection, query, where, getDocs, deleteDoc, doc } = window.firebaseApp;
-      const q = query(collection(db, 'entries'), where('date', '==', dateStr));
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await db.collection('entries').where('date', '==', dateStr).get();
       
       for (const docSnapshot of querySnapshot.docs) {
-        await deleteDoc(doc(db, 'entries', docSnapshot.id));
+        await docSnapshot.ref.delete();
       }
     }
     
