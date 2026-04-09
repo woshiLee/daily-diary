@@ -3152,63 +3152,47 @@ function initAuth() {
 // 登录弹窗 HTML
 // ===== 登录注册页面 HTML =====
 const authPagesHTML = `
-<!-- 登录页面 -->
-<div id="page-login" class="page" style="display:none;">
+<!-- 登录注册页面 -->
+<div id="page-auth" class="page" style="display:none;">
   <div class="auth-page">
     <div class="auth-header">
       <span class="auth-back" onclick="goBack()">‹</span>
-      <span class="auth-title">登录</span>
-      <span class="auth-link" onclick="showRegisterPage()">注册 ›</span>
     </div>
+    
     <div class="auth-content">
-      <div class="auth-tabs">
-        <button class="auth-tab active" data-tab="email" onclick="switchLoginTab('email')">邮箱</button>
-        <button class="auth-tab" data-tab="phone" onclick="switchLoginTab('phone')">手机</button>
+      <!-- Logo 和欢迎语 -->
+      <div class="auth-welcome">
+        <div class="auth-logo">📔</div>
+        <h1 class="auth-title" id="auth-title">欢迎回来</h1>
+        <p class="auth-subtitle" id="auth-subtitle">记录每一天的美好</p>
       </div>
       
-      <!-- 邮箱登录 -->
-      <div id="login-email-form" class="auth-form">
-        <div class="form-group">
-          <input type="email" id="login-email" placeholder="邮箱地址">
-        </div>
-        <div class="form-group">
-          <input type="password" id="login-password" placeholder="密码">
-        </div>
-        <div class="form-error" id="login-error"></div>
-        <button class="btn-primary" onclick="handleEmailLogin()">登录</button>
+      <!-- 登录/注册切换 -->
+      <div class="auth-toggle">
+        <button class="auth-toggle-btn active" id="toggle-login" onclick="switchAuthMode('login')">登录</button>
+        <button class="auth-toggle-btn" id="toggle-register" onclick="switchAuthMode('register')">注册</button>
       </div>
       
-      <!-- 手机登录 -->
-      <div id="login-phone-form" class="auth-form" style="display:none;">
+      <!-- 登录表单 -->
+      <div id="auth-login-form" class="auth-form">
         <div class="form-group">
-          <input type="tel" id="login-phone" placeholder="手机号">
+          <input type="email" id="auth-email" placeholder="邮箱地址">
         </div>
-        <div id="recaptcha-container"></div>
-        <div class="form-error" id="login-phone-error"></div>
-        <button class="btn-primary" onclick="handlePhoneSendCode()">发送验证码</button>
-        <div id="login-code-section" style="display:none; margin-top:16px;">
-          <div class="form-group">
-            <input type="text" id="login-code" placeholder="输入6位验证码" maxlength="6">
-          </div>
-          <button class="btn-primary" onclick="handlePhoneVerify()">验证登录</button>
+        <div class="form-group">
+          <input type="password" id="auth-password" placeholder="密码">
         </div>
+        <div class="form-options">
+          <label class="remember-me">
+            <input type="checkbox" id="auth-remember"> 记住我
+          </label>
+          <a href="#" class="forgot-link" onclick="showToast('请联系管理员重置密码'); return false;">忘记密码?</a>
+        </div>
+        <div class="form-error" id="auth-error"></div>
+        <button class="btn-primary btn-large" onclick="handleAuthSubmit()">登录</button>
       </div>
       
-      <button class="btn-text" onclick="handleAnonymousLogin()">游客模式</button>
-    </div>
-  </div>
-</div>
-
-<!-- 注册页面 -->
-<div id="page-register" class="page" style="display:none;">
-  <div class="auth-page">
-    <div class="auth-header">
-      <span class="auth-back" onclick="goBack()">‹</span>
-      <span class="auth-title">注册</span>
-      <span class="auth-link" onclick="showLoginPage()">登录 ›</span>
-    </div>
-    <div class="auth-content">
-      <div class="auth-form">
+      <!-- 注册表单 -->
+      <div id="auth-register-form" class="auth-form" style="display:none;">
         <div class="form-group">
           <input type="email" id="register-email" placeholder="邮箱地址">
         </div>
@@ -3219,7 +3203,7 @@ const authPagesHTML = `
           <input type="password" id="register-password2" placeholder="确认密码">
         </div>
         <div class="form-error" id="register-error"></div>
-        <button class="btn-primary" onclick="handleEmailRegister()">注册</button>
+        <button class="btn-primary btn-large" onclick="handleAuthSubmit()">注册</button>
       </div>
       
       <button class="btn-text" onclick="handleAnonymousLogin()">游客模式</button>
@@ -3254,17 +3238,13 @@ document.body.insertAdjacentHTML('beforeend', authPagesHTML);
 // 登录相关变量
 let confirmationResult = null;
 let recaptchaVerifier = null;
+let currentAuthMode = 'login';
 
 // 页面导航函数
 function showLoginPage() {
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-  document.getElementById('page-login').style.display = 'flex';
-  initRecaptcha();
-}
-
-function showRegisterPage() {
-  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-  document.getElementById('page-register').style.display = 'flex';
+  document.getElementById('page-auth').style.display = 'flex';
+  switchAuthMode('login');
 }
 
 function showAccountModal() {
@@ -3279,35 +3259,51 @@ function closeAccountModal() {
   document.getElementById('account-modal').style.display = 'none';
 }
 
-// 切换登录方式
-function switchLoginTab(tab) {
-  document.querySelectorAll('#page-login .auth-tab').forEach(t => t.classList.remove('active'));
-  document.querySelector(`#page-login [data-tab="${tab}"]`).classList.add('active');
-  document.getElementById('login-email-form').style.display = tab === 'email' ? 'block' : 'none';
-  document.getElementById('login-phone-form').style.display = tab === 'phone' ? 'block' : 'none';
+// 切换登录/注册模式
+function switchAuthMode(mode) {
+  currentAuthMode = mode;
+  const loginBtn = document.getElementById('toggle-login');
+  const registerBtn = document.getElementById('toggle-register');
+  const loginForm = document.getElementById('auth-login-form');
+  const registerForm = document.getElementById('auth-register-form');
+  const title = document.getElementById('auth-title');
+  const subtitle = document.getElementById('auth-subtitle');
+  
+  if (mode === 'login') {
+    loginBtn.classList.add('active');
+    registerBtn.classList.remove('active');
+    loginForm.style.display = 'block';
+    registerForm.style.display = 'none';
+    title.textContent = '欢迎回来';
+    subtitle.textContent = '记录每一天的美好';
+  } else {
+    loginBtn.classList.remove('active');
+    registerBtn.classList.add('active');
+    loginForm.style.display = 'none';
+    registerForm.style.display = 'block';
+    title.textContent = '创建账号';
+    subtitle.textContent = '开始记录你的生活';
+  }
+  
+  // 清除错误信息
+  document.getElementById('auth-error').textContent = '';
+  document.getElementById('register-error').textContent = '';
 }
 
-// 初始化 reCAPTCHA
-function initRecaptcha() {
-  if (recaptchaVerifier) return recaptchaVerifier;
-  try {
-    const { auth, RecaptchaVerifier } = window.firebaseApp;
-    recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
-      'size': 'normal',
-      'callback': () => {},
-      'expired-callback': () => { showToast('验证过期'); }
-    }, auth);
-    recaptchaVerifier.render();
-  } catch (e) {
-    console.error('reCAPTCHA 初始化失败:', e);
+// 提交处理
+async function handleAuthSubmit() {
+  if (currentAuthMode === 'login') {
+    await handleEmailLogin();
+  } else {
+    await handleEmailRegister();
   }
 }
 
 // 邮箱登录
 async function handleEmailLogin() {
-  const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
-  const errorEl = document.getElementById('login-error');
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errorEl = document.getElementById('auth-error');
   
   if (!email || !password) { errorEl.textContent = '请填写所有字段'; return; }
   
@@ -3337,37 +3333,6 @@ async function handleEmailRegister() {
     await createUserWithEmailAndPassword(auth, email, password);
     goBack();
     showToast('注册成功');
-  } catch (err) {
-    errorEl.textContent = getErrorMessage(err.code);
-  }
-}
-
-// 手机发送验证码
-async function handlePhoneSendCode() {
-  const phone = document.getElementById('login-phone').value.trim();
-  const errorEl = document.getElementById('login-phone-error');
-  if (!phone) { errorEl.textContent = '请输入手机号'; return; }
-  
-  try {
-    const { auth, signInWithPhoneNumber } = window.firebaseApp;
-    confirmationResult = await signInWithPhoneNumber(auth, phone, recaptchaVerifier);
-    document.getElementById('login-code-section').style.display = 'block';
-    showToast('验证码已发送');
-  } catch (err) {
-    errorEl.textContent = getErrorMessage(err.code);
-  }
-}
-
-// 手机验证登录
-async function handlePhoneVerify() {
-  const code = document.getElementById('login-code').value.trim();
-  const errorEl = document.getElementById('login-phone-error');
-  if (!code) { errorEl.textContent = '请输入验证码'; return; }
-  
-  try {
-    await confirmationResult.confirm(code);
-    goBack();
-    showToast('登录成功');
   } catch (err) {
     errorEl.textContent = getErrorMessage(err.code);
   }
@@ -3582,54 +3547,110 @@ const authStyles = `
   display: flex;
   flex-direction: column;
   padding: 0 24px;
-  padding-top: 20px;
 }
 .auth-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
   padding: 16px 0;
 }
 .auth-back {
   font-size: 32px;
   color: var(--text);
   cursor: pointer;
-  padding: 0 8px;
-}
-.auth-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-.auth-link {
-  color: var(--primary);
-  cursor: pointer;
-  font-size: 14px;
 }
 .auth-content {
   flex: 1;
-}
-.auth-tabs {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 320px;
+  margin: 0 auto;
+  width: 100%;
+}
+.auth-welcome {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.auth-logo {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+.auth-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 8px 0;
+}
+.auth-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+.auth-toggle {
+  display: flex;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 4px;
   margin-bottom: 24px;
 }
-.auth-tab {
+.auth-toggle-btn {
   flex: 1;
   padding: 12px;
   border: none;
-  background: var(--bg-secondary);
+  background: transparent;
   border-radius: 10px;
   cursor: pointer;
   font-size: 15px;
+  font-weight: 500;
   color: var(--text-secondary);
+  transition: all 0.2s;
 }
-.auth-tab.active {
-  background: var(--primary);
-  color: white;
+.auth-toggle-btn.active {
+  background: white;
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
-.auth-form {
+.auth-form .form-group {
   margin-bottom: 16px;
+}
+.auth-form input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  font-size: 16px;
+  background: var(--bg);
+  color: var(--text);
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+.auth-form input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.remember-me input {
+  width: auto;
+}
+.forgot-link {
+  color: var(--primary);
+  text-decoration: none;
+}
+.btn-large {
+  padding: 16px;
+  font-size: 17px;
+  border-radius: 12px;
 }
 </style>
 `;
