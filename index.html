@@ -548,7 +548,7 @@
     cursor: pointer;
   }
   .avatar {
-    width: 52px; height: 52px; border-radius: 50%;
+    width: 52px; height: 52px; border-radius: 12px;
     background: var(--border); display: flex; align-items: center; justify-content: center;
     font-size: 22px;
   }
@@ -929,11 +929,11 @@
 
   <div style="overflow-y:auto; flex:1; padding-bottom:40px;">
     <!-- 头像 -->
-    <div class="settings-profile">
-      <div class="avatar">🙂</div>
+    <div class="settings-profile" onclick="openProfileModal()">
+      <div class="avatar" id="settings-avatar">🙂</div>
       <div class="profile-info">
-        <div class="profile-name">昵称</div>
-        <div class="profile-sub">账号/ID/个人资料</div>
+        <div class="profile-name" id="settings-nickname">昵称</div>
+        <div class="profile-sub" id="settings-login-id">账号</div>
       </div>
       <span class="settings-arrow">›</span>
     </div>
@@ -1009,6 +1009,29 @@
     开启云同步后，日记数据将加密存储至云端，可在多设备间访问。未登录时仅本地保存。
   </div>
 </div>
+
+<!-- ==================== 个人资料弹窗 ==================== -->
+<div class="modal-overlay" id="profile-modal" onclick="closeProfileModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-title">个人资料</div>
+    <div style="margin-bottom:20px;">
+      <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">头像</div>
+      <div id="avatar-preview-area" style="display:flex; flex-direction:column; align-items:center; gap:16px;">
+        <div id="avatar-preview" style="width:80px; height:80px; border-radius:16px; background:var(--card-bg); display:flex; align-items:center; justify-content:center; font-size:40px; border:2px solid var(--border); overflow:hidden;">🙂</div>
+        <div style="display:flex; gap:10px;">
+          <button onclick="document.getElementById('avatar-upload').click()" style="padding:10px 20px; background:var(--card-bg); border:1.5px solid var(--border); border-radius:8px; font-size:14px; cursor:pointer;">上传图片</button>
+          <button onclick="resetToDefaultAvatar()" style="padding:10px 14px; background:var(--card-bg); border:1.5px solid var(--border); border-radius:8px; font-size:14px; cursor:pointer;">默认</button>
+        </div>
+      </div>
+    </div>
+    <div style="margin-bottom:24px;">
+      <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">昵称</div>
+      <input type="text" id="profile-nickname-input" placeholder="输入昵称" style="width:100%; padding:12px; border:1.5px solid var(--border); border-radius:8px; font-size:15px; background:var(--card-bg); color:var(--text-primary); box-sizing:border-box;">
+    </div>
+    <button onclick="saveProfile()" style="width:100%; padding:14px; background:var(--text-primary); color:#fff; border:none; border-radius:10px; font-size:15px; font-weight:500; cursor:pointer;">保存</button>
+  </div>
+</div>
+<input type="file" id="avatar-upload" accept="image/*" style="display:none" onchange="handleAvatarUpload(event)">
 
 <!-- ==================== 导出弹窗 ==================== -->
 <div class="modal-overlay" id="export-modal" onclick="closeExportSheet(event)">
@@ -1209,6 +1232,95 @@ const MOODS = {
 
 // 日记数据（从 Firebase 加载，不再使用模拟数据）
 let entries = {};
+
+// ===== 用户信息 =====
+const DEFAULT_AVATAR = '🙂';
+let userProfile = {
+  nickname: '昵称',
+  avatar: '🙂',
+  isCustomAvatar: false,
+  isLoggedIn: false,
+  loginId: ''
+};
+let selectedAvatar = DEFAULT_AVATAR;
+let isCustomAvatar = false;
+
+function loadUserProfile() {
+  const saved = localStorage.getItem('diary_user_profile');
+  if (saved) userProfile = JSON.parse(saved);
+  updateProfileDisplay();
+}
+
+function saveUserProfile() {
+  localStorage.setItem('diary_user_profile', JSON.stringify(userProfile));
+  updateProfileDisplay();
+}
+
+function updateProfileDisplay() {
+  const avatarEl = document.getElementById('settings-avatar');
+  const nameEl = document.getElementById('settings-nickname');
+  const loginIdEl = document.getElementById('settings-login-id');
+  if (avatarEl) {
+    if (userProfile.isCustomAvatar && userProfile.avatar.startsWith('data:')) {
+      avatarEl.innerHTML = `<img src="${userProfile.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">`;
+    } else {
+      avatarEl.textContent = userProfile.avatar;
+    }
+  }
+  if (nameEl) nameEl.textContent = userProfile.nickname;
+  if (loginIdEl) {
+    loginIdEl.textContent = (userProfile.isLoggedIn && userProfile.loginId) ? userProfile.loginId : '账号';
+  }
+}
+
+function openProfileModal() {
+  document.getElementById('profile-nickname-input').value = userProfile.nickname;
+  renderAvatarPreview();
+  document.getElementById('profile-modal').classList.add('open');
+}
+
+function closeProfileModal(e) {
+  if (!e || e.target === document.getElementById('profile-modal')) {
+    document.getElementById('profile-modal').classList.remove('open');
+  }
+}
+
+function renderAvatarPreview() {
+  const preview = document.getElementById('avatar-preview');
+  if (isCustomAvatar && selectedAvatar.startsWith('data:')) {
+    preview.innerHTML = `<img src="${selectedAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">`;
+  } else {
+    preview.textContent = selectedAvatar;
+  }
+}
+
+function resetToDefaultAvatar() {
+  selectedAvatar = DEFAULT_AVATAR;
+  isCustomAvatar = false;
+  renderAvatarPreview();
+}
+
+async function saveProfile() {
+  userProfile.nickname = document.getElementById('profile-nickname-input').value.trim() || '昵称';
+  userProfile.avatar = selectedAvatar;
+  userProfile.isCustomAvatar = isCustomAvatar;
+  saveUserProfile();
+  closeProfileModal();
+  showToast('资料已保存');
+}
+
+async function handleAvatarUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  try {
+    selectedAvatar = await fileToBase64(file);
+    isCustomAvatar = true;
+    renderAvatarPreview();
+    showToast('头像已更新');
+  } catch (err) {
+    showToast('图片处理失败');
+  }
+}
 
 // ===== 状态 =====
 let currentYear = 2026;
@@ -2994,6 +3106,9 @@ document.getElementById('year-btn-mood').classList.toggle('active', yearMode ===
 document.getElementById('year-btn-photo').classList.toggle('active', yearMode === 'photo');
 // 初始化视图切换按钮图标
 toggleCalViewIcon();
+
+// 加载用户信息
+loadUserProfile();
 
 // 从 Firebase 加载真实数据（等 Firebase SDK 初始化完成）
 function initFirebase() {
