@@ -1256,12 +1256,12 @@ function updateProfileDisplay() {
   }
 }
 
-// 点击头像区域：已登录显示账号信息，未登录显示登录弹窗
+// 点击头像区域：已登录显示账号信息，未登录显示登录页面
 function handleProfileClick() {
   if (userProfile.isLoggedIn) {
     showAccountModal();
   } else {
-    showLoginModal();
+    showLoginPage();
   }
 }
 
@@ -3150,58 +3150,84 @@ function initAuth() {
 }
 
 // 登录弹窗 HTML
-const loginModalHTML = `
-<!-- 登录弹窗 -->
-<div id="login-modal" class="modal" style="display:none;">
-  <div class="modal-content">
-    <div class="modal-header">
-      <span class="modal-title">登录 / 注册</span>
-      <span class="modal-close" onclick="closeLoginModal()">&times;</span>
+// ===== 登录注册页面 HTML =====
+const authPagesHTML = `
+<!-- 登录页面 -->
+<div id="page-login" class="page" style="display:none;">
+  <div class="auth-page">
+    <div class="auth-header">
+      <span class="auth-back" onclick="goBack()">‹</span>
+      <span class="auth-title">登录</span>
+      <span class="auth-link" onclick="showRegisterPage()">注册 ›</span>
     </div>
-    <div class="modal-body">
-      <!-- 登录方式切换 -->
+    <div class="auth-content">
       <div class="auth-tabs">
-        <button class="auth-tab active" data-tab="email" onclick="switchAuthTab('email')">邮箱登录</button>
-        <button class="auth-tab" data-tab="phone" onclick="switchAuthTab('phone')">手机登录</button>
+        <button class="auth-tab active" data-tab="email" onclick="switchLoginTab('email')">邮箱</button>
+        <button class="auth-tab" data-tab="phone" onclick="switchLoginTab('phone')">手机</button>
       </div>
       
-      <!-- 邮箱登录表单 -->
-      <div id="auth-email-form" class="auth-form">
+      <!-- 邮箱登录 -->
+      <div id="login-email-form" class="auth-form">
         <div class="form-group">
-          <label>邮箱</label>
-          <input type="email" id="login-email" placeholder="请输入邮箱">
+          <input type="email" id="login-email" placeholder="邮箱地址">
         </div>
         <div class="form-group">
-          <label>密码</label>
-          <input type="password" id="login-password" placeholder="请输入密码">
+          <input type="password" id="login-password" placeholder="密码">
         </div>
-        <div class="form-error" id="email-error"></div>
+        <div class="form-error" id="login-error"></div>
         <button class="btn-primary" onclick="handleEmailLogin()">登录</button>
-        <button class="btn-secondary" onclick="handleEmailRegister()">注册新账号</button>
       </div>
       
-      <!-- 手机登录表单 -->
-      <div id="auth-phone-form" class="auth-form" style="display:none;">
+      <!-- 手机登录 -->
+      <div id="login-phone-form" class="auth-form" style="display:none;">
         <div class="form-group">
-          <label>手机号</label>
-          <input type="tel" id="login-phone" placeholder="+86 13800000000">
+          <input type="tel" id="login-phone" placeholder="手机号">
         </div>
         <div id="recaptcha-container"></div>
-        <div class="form-error" id="phone-error"></div>
+        <div class="form-error" id="login-phone-error"></div>
         <button class="btn-primary" onclick="handlePhoneSendCode()">发送验证码</button>
-        <div id="phone-code-section" style="display:none;" class="form-group">
-          <label>验证码</label>
-          <input type="text" id="login-code" placeholder="请输入6位验证码" maxlength="6">
-          <button class="btn-secondary" onclick="handlePhoneVerify()">验证登录</button>
+        <div id="login-code-section" style="display:none; margin-top:16px;">
+          <div class="form-group">
+            <input type="text" id="login-code" placeholder="输入6位验证码" maxlength="6">
+          </div>
+          <button class="btn-primary" onclick="handlePhoneVerify()">验证登录</button>
         </div>
       </div>
       
-      <button class="btn-text" onclick="handleAnonymousLogin()">游客模式（不登录）</button>
+      <button class="btn-text" onclick="handleAnonymousLogin()">游客模式</button>
     </div>
   </div>
 </div>
 
-<!-- 账号设置弹窗 -->
+<!-- 注册页面 -->
+<div id="page-register" class="page" style="display:none;">
+  <div class="auth-page">
+    <div class="auth-header">
+      <span class="auth-back" onclick="goBack()">‹</span>
+      <span class="auth-title">注册</span>
+      <span class="auth-link" onclick="showLoginPage()">登录 ›</span>
+    </div>
+    <div class="auth-content">
+      <div class="auth-form">
+        <div class="form-group">
+          <input type="email" id="register-email" placeholder="邮箱地址">
+        </div>
+        <div class="form-group">
+          <input type="password" id="register-password" placeholder="密码（至少6位）">
+        </div>
+        <div class="form-group">
+          <input type="password" id="register-password2" placeholder="确认密码">
+        </div>
+        <div class="form-error" id="register-error"></div>
+        <button class="btn-primary" onclick="handleEmailRegister()">注册</button>
+      </div>
+      
+      <button class="btn-text" onclick="handleAnonymousLogin()">游客模式</button>
+    </div>
+  </div>
+</div>
+
+<!-- 账号信息弹窗 -->
 <div id="account-modal" class="modal" style="display:none;">
   <div class="modal-content">
     <div class="modal-header">
@@ -3222,34 +3248,30 @@ const loginModalHTML = `
 </div>
 `;
 
-// 注入登录弹窗 HTML
-document.body.insertAdjacentHTML('beforeend', loginModalHTML);
+// 注入登录注册页面 HTML
+document.body.insertAdjacentHTML('beforeend', authPagesHTML);
 
-// 登录相关函数
+// 登录相关变量
 let confirmationResult = null;
 let recaptchaVerifier = null;
 
-function showLoginModal() {
-  document.getElementById('login-modal').style.display = 'flex';
-  // 初始化 reCAPTCHA
+// 页面导航函数
+function showLoginPage() {
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.getElementById('page-login').style.display = 'flex';
   initRecaptcha();
 }
 
-function closeLoginModal() {
-  document.getElementById('login-modal').style.display = 'none';
-  clearAuthForms();
+function showRegisterPage() {
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.getElementById('page-register').style.display = 'flex';
 }
 
 function showAccountModal() {
   const modal = document.getElementById('account-modal');
-  const avatar = document.getElementById('account-avatar');
-  const nickname = document.getElementById('account-nickname');
-  const id = document.getElementById('account-id');
-  
-  avatar.textContent = userProfile.avatar;
-  nickname.textContent = userProfile.nickname;
-  id.textContent = userProfile.loginId || '';
-  
+  document.getElementById('account-avatar').textContent = userProfile.avatar;
+  document.getElementById('account-nickname').textContent = userProfile.nickname;
+  document.getElementById('account-id').textContent = userProfile.loginId || '';
   modal.style.display = 'flex';
 }
 
@@ -3257,22 +3279,27 @@ function closeAccountModal() {
   document.getElementById('account-modal').style.display = 'none';
 }
 
-function switchAuthTab(tab) {
-  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
-  document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
-  document.getElementById('auth-email-form').style.display = tab === 'email' ? 'block' : 'none';
-  document.getElementById('auth-phone-form').style.display = tab === 'phone' ? 'block' : 'none';
+// 切换登录方式
+function switchLoginTab(tab) {
+  document.querySelectorAll('#page-login .auth-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`#page-login [data-tab="${tab}"]`).classList.add('active');
+  document.getElementById('login-email-form').style.display = tab === 'email' ? 'block' : 'none';
+  document.getElementById('login-phone-form').style.display = tab === 'phone' ? 'block' : 'none';
 }
 
+// 初始化 reCAPTCHA
 function initRecaptcha() {
-  const { auth, RecaptchaVerifier } = window.firebaseApp;
-  if (!recaptchaVerifier) {
+  if (recaptchaVerifier) return recaptchaVerifier;
+  try {
+    const { auth, RecaptchaVerifier } = window.firebaseApp;
     recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
       'size': 'normal',
-      'callback': () => { console.log('reCAPTCHA 验证成功'); },
-      'expired-callback': () => { showToast('验证过期，请重试'); }
+      'callback': () => {},
+      'expired-callback': () => { showToast('验证过期'); }
     }, auth);
     recaptchaVerifier.render();
+  } catch (e) {
+    console.error('reCAPTCHA 初始化失败:', e);
   }
 }
 
@@ -3280,17 +3307,14 @@ function initRecaptcha() {
 async function handleEmailLogin() {
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
-  const errorEl = document.getElementById('email-error');
+  const errorEl = document.getElementById('login-error');
   
-  if (!email || !password) {
-    errorEl.textContent = '请输入邮箱和密码';
-    return;
-  }
+  if (!email || !password) { errorEl.textContent = '请填写所有字段'; return; }
   
   try {
     const { auth, signInWithEmailAndPassword } = window.firebaseApp;
-    const result = await signInWithEmailAndPassword(auth, email, password);
-    closeLoginModal();
+    await signInWithEmailAndPassword(auth, email, password);
+    goBack();
     showToast('登录成功');
   } catch (err) {
     errorEl.textContent = getErrorMessage(err.code);
@@ -3299,25 +3323,20 @@ async function handleEmailLogin() {
 
 // 邮箱注册
 async function handleEmailRegister() {
-  const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
-  const errorEl = document.getElementById('email-error');
+  const email = document.getElementById('register-email').value.trim();
+  const password = document.getElementById('register-password').value;
+  const password2 = document.getElementById('register-password2').value;
+  const errorEl = document.getElementById('register-error');
   
-  if (!email || !password) {
-    errorEl.textContent = '请输入邮箱和密码';
-    return;
-  }
-  
-  if (password.length < 6) {
-    errorEl.textContent = '密码至少6位';
-    return;
-  }
+  if (!email || !password || !password2) { errorEl.textContent = '请填写所有字段'; return; }
+  if (password !== password2) { errorEl.textContent = '两次密码不一致'; return; }
+  if (password.length < 6) { errorEl.textContent = '密码至少6位'; return; }
   
   try {
     const { auth, createUserWithEmailAndPassword } = window.firebaseApp;
-    const result = await createUserWithEmailAndPassword(auth, email, password);
-    closeLoginModal();
-    showToast('注册成功并已登录');
+    await createUserWithEmailAndPassword(auth, email, password);
+    goBack();
+    showToast('注册成功');
   } catch (err) {
     errorEl.textContent = getErrorMessage(err.code);
   }
@@ -3326,17 +3345,13 @@ async function handleEmailRegister() {
 // 手机发送验证码
 async function handlePhoneSendCode() {
   const phone = document.getElementById('login-phone').value.trim();
-  const errorEl = document.getElementById('phone-error');
-  
-  if (!phone) {
-    errorEl.textContent = '请输入手机号';
-    return;
-  }
+  const errorEl = document.getElementById('login-phone-error');
+  if (!phone) { errorEl.textContent = '请输入手机号'; return; }
   
   try {
     const { auth, signInWithPhoneNumber } = window.firebaseApp;
     confirmationResult = await signInWithPhoneNumber(auth, phone, recaptchaVerifier);
-    document.getElementById('phone-code-section').style.display = 'block';
+    document.getElementById('login-code-section').style.display = 'block';
     showToast('验证码已发送');
   } catch (err) {
     errorEl.textContent = getErrorMessage(err.code);
@@ -3346,16 +3361,12 @@ async function handlePhoneSendCode() {
 // 手机验证登录
 async function handlePhoneVerify() {
   const code = document.getElementById('login-code').value.trim();
-  const errorEl = document.getElementById('phone-error');
-  
-  if (!code) {
-    errorEl.textContent = '请输入验证码';
-    return;
-  }
+  const errorEl = document.getElementById('login-phone-error');
+  if (!code) { errorEl.textContent = '请输入验证码'; return; }
   
   try {
     await confirmationResult.confirm(code);
-    closeLoginModal();
+    goBack();
     showToast('登录成功');
   } catch (err) {
     errorEl.textContent = getErrorMessage(err.code);
@@ -3364,8 +3375,8 @@ async function handlePhoneVerify() {
 
 // 游客模式
 function handleAnonymousLogin() {
-  closeLoginModal();
-  showToast('游客模式，无需登录');
+  goBack();
+  showToast('游客模式');
 }
 
 // 退出登录
@@ -3374,36 +3385,26 @@ async function handleLogout() {
     const { auth, signOut } = window.firebaseApp;
     await signOut(auth);
     closeAccountModal();
-    showToast('已退出登录');
+    showToast('已退出');
   } catch (err) {
     showToast('退出失败');
   }
 }
 
-function clearAuthForms() {
-  document.getElementById('login-email').value = '';
-  document.getElementById('login-password').value = '';
-  document.getElementById('login-phone').value = '';
-  document.getElementById('login-code').value = '';
-  document.getElementById('email-error').textContent = '';
-  document.getElementById('phone-error').textContent = '';
-  document.getElementById('phone-code-section').style.display = 'none';
-}
-
 function getErrorMessage(code) {
   const messages = {
-    'auth/user-not-found': '用户不存在，请先注册',
+    'auth/user-not-found': '用户不存在',
     'auth/wrong-password': '密码错误',
     'auth/email-already-in-use': '该邮箱已注册',
     'auth/weak-password': '密码强度不足',
     'auth/invalid-email': '邮箱格式不正确',
-    'auth/too-many-requests': '操作过于频繁，请稍后重试',
+    'auth/too-many-requests': '操作过于频繁',
     'auth/invalid-verification-code': '验证码错误',
     'auth/code-expired': '验证码已过期',
     'auth/quota-exceeded': '短信配额已用完',
-    'auth/requires-recent-login': '请重新登录后再操作'
+    'auth/requires-recent-login': '请重新登录'
   };
-  return messages[code] || '操作失败，请重试';
+  return messages[code] || '操作失败';
 }
 
 // 错误提示样式
@@ -3573,6 +3574,62 @@ const authStyles = `
   margin: 12px 0;
   display: flex;
   justify-content: center;
+}
+
+/* 登录注册页面 */
+.auth-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 24px;
+  padding-top: 20px;
+}
+.auth-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding: 16px 0;
+}
+.auth-back {
+  font-size: 32px;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0 8px;
+}
+.auth-title {
+  font-size: 20px;
+  font-weight: 600;
+}
+.auth-link {
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 14px;
+}
+.auth-content {
+  flex: 1;
+}
+.auth-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.auth-tab {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  background: var(--bg-secondary);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+.auth-tab.active {
+  background: var(--primary);
+  color: white;
+}
+.auth-form {
+  margin-bottom: 16px;
 }
 </style>
 `;

@@ -12,3 +12,5 @@
 - Firebase ES Module 加载: 需要 `window.db` 全局暴露 + `waitForFirebase()` 轮询等待
 - Service Worker: 只缓存 GET 请求 + 静态文件扩展名，其他全部穿透
 - PWA 部署到 GitHub Pages 需要保留 `/daily-diary/` base 路径
+- Firebase Authentication: 邮箱+密码登录、手机号验证码登录
+- 数据按用户 UID 隔离存储（文档ID格式: `uid_date`）
