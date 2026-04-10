@@ -1660,14 +1660,23 @@ async function manualSync() {
       }
     }
     
-    // 3. 从云端下载新数据
+    // 3. 从云端下载新数据（但跳过本地已删除的）
     const q = query(collection(db, 'entries'), where('uid', '==', uid));
     const querySnapshot = await getDocs(q);
     
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
       if (data.date && !data._deleted) {
         const localData = localEntries[data.date];
+        
+        // 检查本地是否已标记删除
+        if (localData && localData._deleted) {
+          // 本地已删除，删除云端数据
+          deleteDoc(docSnap.ref);
+          deleted++;
+          return;
+        }
+        
         const cloudTime = new Date(data.updatedAt || 0).getTime();
         const localTime = localData?.updatedAt ? new Date(localData.updatedAt).getTime() : 0;
         
@@ -1805,11 +1814,19 @@ async function loadEntriesFromFirebase() {
       let cloudCount = 0;
       let mergedCount = 0;
       
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
         if (data.date && !data._deleted) {
           cloudCount++;
           const localData = localEntries[data.date];
+          
+          // 检查本地是否已标记删除
+          if (localData && localData._deleted) {
+            // 本地已删除，删除云端数据
+            const { deleteDoc, doc } = window.firebaseApp;
+            deleteDoc(docSnap.ref);
+            return;
+          }
           
           // 合并策略：比较 updatedAt，保留较新的
           const cloudTime = new Date(data.updatedAt || 0).getTime();
