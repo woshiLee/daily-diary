@@ -3452,13 +3452,16 @@ loadUserProfile();
 // 监听登录状态变化
 function initAuth() {
   const { auth, onAuthStateChanged } = window.firebaseApp;
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
     if (user) {
       userProfile.isLoggedIn = true;
       userProfile.loginId = user.email || user.phoneNumber || user.uid;
       userProfile.uid = user.uid;
       saveUserProfile();
       console.log('用户已登录:', user.uid);
+      // 登录后重新加载该用户的数据
+      await loadEntriesFromFirebase();
+      renderHome();
     } else {
       userProfile.isLoggedIn = false;
       userProfile.loginId = '';
