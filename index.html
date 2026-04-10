@@ -3683,11 +3683,7 @@ function showLoginPage() {
 }
 
 function showSettingsPage() {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-  const el = document.getElementById('page-settings');
-  el.classList.add('active');
-  el.style.display = 'flex';
+  goTo('page-settings');
   // 更新设置页的用户信息显示
   updateProfileDisplay();
 }
