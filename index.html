@@ -371,7 +371,7 @@
   #page-new { background: var(--bg); }
   .new-content { flex: 1; padding: 0 20px; overflow-y: auto; }
   .new-textarea {
-    width: 100%; min-height: 160px;
+    width: 100%; min-height: 480px;
     border: none; background: none; resize: none;
     font-size: 16px; line-height: 1.7; font-family: inherit;
     color: var(--text-primary); outline: none;
@@ -480,27 +480,6 @@
   .detail-body {
     padding: 20px;
     flex: 1;
-  }
-  .detail-delete-btn {
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 70px;
-    background: #FF3B30;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1;
-    cursor: pointer;
-  }
-  .detail-delete-btn svg {
-    width: 28px;
-    height: 28px;
-    stroke: #fff;
-  }
-  .detail-delete-btn:active {
-    background: #E62E24;
   }
   .detail-photos {
     padding: 0 20px;
@@ -870,30 +849,30 @@
       </svg>
     </button>
     <div class="nav-title" id="detail-title-date"></div>
-    <button class="nav-btn" onclick="editCurrentEntry()">
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 17l4-4M7 3v10h10"/>
-        <path d="M10 7l4-4 3 3-4 4"/>
-      </svg>
-    </button>
-  </div>
-  <div class="detail-swipe-container" id="detail-swipe-container">
-    <div class="detail-content" id="detail-content">
-      <div style="overflow-y:auto; flex:1;">
-        <div class="detail-photos" id="detail-photos"></div>
-        <div class="detail-body" id="detail-body">
-          <div class="detail-date" id="detail-date"></div>
-          <div class="detail-weekday" id="detail-weekday"></div>
-          <div class="detail-mood-chip" id="detail-mood-chip"></div>
-          <div class="detail-text" id="detail-text"></div>
-        </div>
-      </div>
+    <div style="display:flex; gap:4px;">
+      <button class="nav-btn" onclick="showDeleteConfirm()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+      </button>
+      <button class="nav-btn" onclick="editCurrentEntry()">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 17l4-4M7 3v10h10"/>
+          <path d="M10 7l4-4 3 3-4 4"/>
+        </svg>
+      </button>
     </div>
-    <div class="detail-delete-btn" id="detail-delete-btn" onclick="deleteCurrentEntry()">
-      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="3 6 5 6 21 6"></polyline>
-        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-      </svg>
+  </div>
+  <div class="detail-content" id="detail-content" style="height:calc(100% - 56px);">
+    <div style="overflow-y:auto; flex:1;">
+      <div class="detail-photos" id="detail-photos"></div>
+      <div class="detail-body" id="detail-body">
+        <div class="detail-date" id="detail-date"></div>
+        <div class="detail-weekday" id="detail-weekday"></div>
+        <div class="detail-mood-chip" id="detail-mood-chip"></div>
+        <div class="detail-text" id="detail-text"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1191,6 +1170,18 @@
   </div>
 </div>
 
+<!-- ==================== 删除确认弹窗 ==================== -->
+<div class="modal-overlay" id="delete-confirm-modal" onclick="closeDeleteConfirm(event)">
+  <div class="modal-sheet" style="padding:24px 20px 32px; text-align:center;">
+    <div style="font-size:18px; font-weight:600; margin-bottom:12px; color:var(--text);">删除日记</div>
+    <div style="font-size:14px; color:var(--text-secondary); margin-bottom:24px;">确定要删除这篇日记吗？此操作无法撤销。</div>
+    <div style="display:flex; gap:12px;">
+      <button onclick="closeDeleteConfirm()" style="flex:1; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--card-bg); font-size:15px; color:var(--text); cursor:pointer;">取消</button>
+      <button onclick="confirmDeleteEntry()" style="flex:1; padding:12px; border:none; border-radius:10px; background:#FF3B30; font-size:15px; color:#fff; cursor:pointer;">删除</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -1469,7 +1460,6 @@ async function initTestData(forceReset = false) {
     
     if (forceReset) {
       // 强制重置：先删除当前用户所有数据，再写入测试数据
-      console.log('强制重置测试数据...');
       const q = query(collection(db, 'entries'), where('uid', '==', uid));
       const querySnapshot = await getDocs(q);
       for (const d of querySnapshot.docs) {
@@ -1479,7 +1469,6 @@ async function initTestData(forceReset = false) {
       for (const item of TEST_DATA) {
         await setDoc(doc(db, 'entries', `${uid}_${item.date}`), { ...item, uid });
       }
-      console.log('测试数据重置完成');
       showToast('测试数据已重置');
       // 重新加载
       await loadEntriesFromFirebase();
@@ -1490,15 +1479,14 @@ async function initTestData(forceReset = false) {
       
       // 如果当前用户数据库为空，写入测试数据
       if (querySnapshot.empty) {
-        console.log('当前用户数据为空，写入测试数据...');
         for (const item of TEST_DATA) {
           await setDoc(doc(db, 'entries', `${uid}_${item.date}`), { ...item, uid });
         }
-        console.log('测试数据写入完成');
       }
     }
   } catch (error) {
     console.error('初始化测试数据失败:', error);
+    throw error;
   }
 }
 
@@ -1527,6 +1515,16 @@ async function loadEntriesFromFirebase() {
     renderHome();
   } catch (error) {
     console.error('加载数据失败:', error);
+    // 本地模式：Firebase 不可用时直接使用测试数据
+    entries = {};
+    TEST_DATA.forEach(item => {
+      entries[item.date] = {
+        mood: item.mood,
+        text: item.text,
+        photos: item.photos || []
+      };
+    });
+    renderHome();
   }
 }
 
@@ -2174,12 +2172,13 @@ async function saveEntry() {
   }
 
 
-  // 检查 Firebase 是否初始化，如果没有则等待
+  // 检查 Firebase 是否初始化
+  let firebaseAvailable = false;
   try {
     await waitForFirebase();
+    firebaseAvailable = true;
   } catch (e) {
-    showToast('Firebase 初始化失败，请刷新页面重试');
-    return;
+    console.log('Firebase 不可用，使用本地模式保存');
   }
 
   showToast('正在保存...');
@@ -2191,7 +2190,7 @@ async function saveEntry() {
   }, 15000);
 
   try {
-    console.log('Firebase 已连接，db:', !!db);
+    console.log('Firebase 可用:', firebaseAvailable);
 
     // 正确处理照片
     const photoUrls = [];
@@ -2258,12 +2257,15 @@ async function saveEntry() {
       updatedAt: new Date().toISOString()
     };
 
-    console.log('使用 setDoc 直接保存...');
-    
-    // 使用 modular API 保存数据（文档ID格式：uid_date）
-    const { db, doc, setDoc, collection } = window.firebaseApp;
-    await setDoc(doc(db, 'entries', `${uid}_${editingDate}`), entryData, { merge: true });
-    console.log('setDoc 调用成功');
+    // 如果 Firebase 可用，保存到云端
+    if (firebaseAvailable && window.firebaseApp && window.firebaseApp.db) {
+      console.log('使用 setDoc 保存到 Firebase...');
+      const { db, doc, setDoc } = window.firebaseApp;
+      await setDoc(doc(db, 'entries', `${uid}_${editingDate}`), entryData, { merge: true });
+      console.log('setDoc 调用成功');
+    } else {
+      console.log('本地模式：仅保存到内存');
+    }
 
     // 更新本地数据
     entries[editingDate] = entryData;
@@ -2275,6 +2277,10 @@ async function saveEntry() {
     setTimeout(() => {
       goBack();
       renderHome();
+      // 如果详情页当前显示的是这篇日记，刷新详情页内容
+      if (window._detailDateStr === editingDate) {
+        openDetail(editingDate);
+      }
     }, 300);
   } catch (error) {
     clearTimeout(saveTimeout);
@@ -2327,85 +2333,31 @@ function openDetail(dateStr) {
   // 记录当前详情的日期，用于编辑
   window._detailDateStr = dateStr;
   
-  // 重置滑动状态
-  const content = document.getElementById('detail-content');
-  content.classList.remove('swiped-left');
-  
-  // 绑定右滑事件（只绑定一次）
-  if (!window._detailSwipeBound) {
-    bindDetailSwipe();
-    window._detailSwipeBound = true;
-  }
-  
   goTo('page-detail');
 }
 
-// 详情页右滑删除
-function bindDetailSwipe() {
-  const container = document.getElementById('detail-swipe-container');
-  const content = document.getElementById('detail-content');
-  let startX = 0;
-  let currentX = 0;
-  let isDragging = false;
-  
-  container.addEventListener('touchstart', (e) => {
-    startX = e.touches[0].clientX;
-    isDragging = true;
-  }, { passive: true });
-  
-  container.addEventListener('touchmove', (e) => {
-    if (!isDragging) return;
-    currentX = e.touches[0].clientX;
-    const diff = startX - currentX;
-    
-    // 左滑（从右向左）显示删除按钮
-    if (diff > 0 && diff < 80) {
-      content.style.transform = `translateX(-${diff}px)`;
-    }
-  }, { passive: true });
-  
-  container.addEventListener('touchend', () => {
-    if (!isDragging) return;
-    isDragging = false;
-    
-    const diff = startX - currentX;
-    content.style.transform = '';
-    
-    if (diff > 40) {
-      // 滑动超过阈值，显示删除按钮
-      content.classList.add('swiped-left');
-    } else {
-      // 恢复原位
-      content.classList.remove('swiped-left');
-    }
-  });
-  
-  container.addEventListener('touchcancel', () => {
-    isDragging = false;
-    content.style.transform = '';
-  });
-  
-  // 点击内容区域恢复原位
-  content.addEventListener('click', (e) => {
-    if (content.classList.contains('swiped-left')) {
-      e.stopPropagation();
-      content.classList.remove('swiped-left');
-    }
-  });
+// 显示删除确认弹窗
+function showDeleteConfirm() {
+  document.getElementById('delete-confirm-modal').classList.add('open');
+}
+
+// 关闭删除确认弹窗
+function closeDeleteConfirm(e) {
+  if (!e || e.target === document.getElementById('delete-confirm-modal')) {
+    document.getElementById('delete-confirm-modal').classList.remove('open');
+  }
+}
+
+// 确认删除
+async function confirmDeleteEntry() {
+  closeDeleteConfirm();
+  await deleteCurrentEntry();
 }
 
 // 删除当前日记
 async function deleteCurrentEntry() {
   const dateStr = window._detailDateStr;
   if (!dateStr) return;
-  
-  if (!confirm('确定要删除这篇日记吗？')) {
-    // 取消删除，恢复原位
-    const content = document.getElementById('detail-content');
-    content.classList.remove('swiped');
-    content.style.transform = '';
-    return;
-  }
   
   showToast('正在删除...');
   
@@ -3848,11 +3800,33 @@ function initFirebase() {
   loadEntriesFromFirebase();
   initAuth();
 }
+
+// 本地模式初始化（直接使用测试数据，不依赖 Firebase）
+function initLocalMode() {
+  entries = {};
+  TEST_DATA.forEach(item => {
+    entries[item.date] = {
+      mood: item.mood,
+      text: item.text,
+      photos: item.photos || []
+    };
+  });
+  renderHome();
+  // 隐藏登录相关UI
+  document.getElementById('settings-login-id').textContent = '本地模式';
+}
+
 // 页面加载时初始化
 if (window.firebaseReady) {
   initFirebase();
 } else {
   window.onFirebaseReady = initFirebase;
+  // 3秒后如果 Firebase 还没准备好，切换到本地模式
+  setTimeout(() => {
+    if (!window.firebaseReady) {
+      initLocalMode();
+    }
+  }, 3000);
 }
 </script>
 </body>
