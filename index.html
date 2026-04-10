@@ -82,12 +82,12 @@
     overflow-x: hidden;
   }
   body {
-    padding-top: env(safe-area-inset-top);
+    padding-top: 0;
     padding-bottom: env(safe-area-inset-bottom);
   }
   
   /* iOS安全区域适配 */
-  .safe-area-top { padding-top: max(10px, env(safe-area-inset-top)); }
+  .safe-area-top { padding-top: max(4px, env(safe-area-inset-top)); }
   .safe-area-bottom { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
   
   /* 全局字体设置：英文和数字用 Courier，中文用汇文明朝体 */
@@ -136,7 +136,7 @@
 
   .nav-bar {
     display: flex; align-items: center; justify-content: space-between;
-    padding: max(52px, calc(10px + env(safe-area-inset-top))) 20px 12px;
+    padding: max(12px, env(safe-area-inset-top)) 20px 12px;
     background: var(--bg);
   }
   .nav-title { font-size: 17px; font-weight: 600; }
