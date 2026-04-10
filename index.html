@@ -258,13 +258,6 @@
     font-size: 13px; color: var(--text-secondary);
     margin-bottom: 12px; font-weight: 400;
   }
-  /* 日记列表滑动容器 */
-  .entry-swipe-wrap {
-    position: relative;
-    margin-bottom: 12px;
-    overflow: hidden;
-    border-radius: var(--radius);
-  }
   .entry-card {
     background: var(--card-bg);
     border-radius: var(--radius);
@@ -272,27 +265,9 @@
     cursor: pointer;
     display: flex; gap: 12px; align-items: center;
     position: relative;
-    transition: transform 0.25s ease-out;
-    z-index: 2;
-  }
-  .entry-card.swiped-left {
-    transform: translateX(-70px);
+    margin-bottom: 12px;
   }
   .entry-card:active { background-color: var(--border); }
-  .entry-delete-btn {
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 70px;
-    background: #FF3B30;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1;
-    cursor: pointer;
-    border-radius: 0 var(--radius) var(--radius) 0;
-  }
   .entry-delete-btn svg {
     width: 24px;
     height: 24px;
@@ -531,6 +506,11 @@
   .settings-row:last-child { border-bottom: none; }
   .settings-row:active { background: var(--bg); }
   .settings-row:hover { background: var(--bg); }
+  .logout-section { cursor: pointer; }
+  .logout-section .settings-row { pointer-events: none; }
+  .logout-section:active { background: var(--bg); }
+  .logout-section:active .settings-row { background: var(--bg); }
+  .logout-row { justify-content: center !important; color: #FF3B30 !important; width: 100%; }
   .settings-row-label { font-size: 13px; }
   .settings-row-right { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 12px; }
   .settings-arrow { color: #C0BDB8; font-size: 12px; }
@@ -554,7 +534,7 @@
 
   .settings-footer {
     text-align: center; padding: 20px;
-    font-size: 13px; color: var(--text-secondary);
+    font-size: 13px; color: #bbb;
   }
 
   /* ===== 导出弹窗 ===== */
@@ -912,10 +892,6 @@
         <span class="settings-row-label">同步</span>
         <div class="settings-row-right"><span class="settings-arrow">›</span></div>
       </div>
-      <div class="settings-row" onclick="resetTestData()" style="color:#e74c3c;">
-        <span class="settings-row-label">重置测试数据</span>
-        <div class="settings-row-right"><span class="settings-arrow">›</span></div>
-      </div>
     </div>
 
     <!-- 关于 -->
@@ -935,6 +911,18 @@
       <div class="settings-row" onclick="showToast('小红书')">
         <span class="settings-row-label">小红书</span>
         <div class="settings-row-right"><span class="settings-arrow">›</span></div>
+      </div>
+    </div>
+
+    <!-- 退出登录 -->
+    <div class="settings-section logout-section" id="settings-logout-row" style="display:none;" onclick="handleLogout()">
+      <div class="settings-row logout-row">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <polyline points="16 17 21 12 16 7"></polyline>
+          <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+        <span class="settings-row-label" style="color:#FF3B30;">退出登录</span>
       </div>
     </div>
 
@@ -1238,6 +1226,7 @@ function updateProfileDisplay() {
   const avatarEl = document.getElementById('settings-avatar');
   const nameEl = document.getElementById('settings-nickname');
   const loginIdEl = document.getElementById('settings-login-id');
+  const logoutRow = document.getElementById('settings-logout-row');
   
   if (userProfile.isLoggedIn) {
     // 已登录状态
@@ -1252,18 +1241,22 @@ function updateProfileDisplay() {
     if (loginIdEl) {
       loginIdEl.textContent = userProfile.loginId || '账号';
     }
+    // 显示退出登录按钮
+    if (logoutRow) logoutRow.style.display = 'flex';
   } else {
-    // 未登录状态
-    if (avatarEl) avatarEl.textContent = '🙂';
-    if (nameEl) nameEl.textContent = '登录账号';
-    if (loginIdEl) loginIdEl.textContent = '点击登录';
+    // 未登录状态 - 游客模式
+    if (avatarEl) avatarEl.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;color:#666;">游</div>';
+    if (nameEl) nameEl.textContent = '游客模式';
+    if (loginIdEl) loginIdEl.textContent = '点击登录以使用云同步';
+    // 隐藏退出登录按钮
+    if (logoutRow) logoutRow.style.display = 'none';
   }
 }
 
-// 点击头像区域：已登录显示账号信息弹窗，未登录显示登录页面
+// 点击头像区域：已登录显示修改资料，未登录显示登录页面
 function handleProfileClick() {
   if (userProfile.isLoggedIn) {
-    showAccountModal();
+    openProfileModal();
   } else {
     showLoginPage();
   }
@@ -1657,10 +1650,6 @@ function renderEntriesList() {
     const wd = weekDayNames[dt.getDay()];
     const mood = MOODS[entry.mood];
 
-    // 创建滑动容器
-    const swipeWrap = document.createElement('div');
-    swipeWrap.className = 'entry-swipe-wrap';
-    
     // 卡片内容
     const card = document.createElement('div');
     card.className = 'entry-card';
@@ -1684,38 +1673,11 @@ function renderEntriesList() {
     `;
     
     // 点击卡片打开详情
-    card.onclick = (e) => {
-      // 如果已经滑动显示删除按钮，点击时先关闭
-      if (card.classList.contains('swiped-left')) {
-        card.classList.remove('swiped-left');
-        e.stopPropagation();
-        return;
-      }
+    card.onclick = () => {
       openDetail(dateStr);
     };
     
-    // 删除按钮
-    const deleteBtn = document.createElement('div');
-    deleteBtn.className = 'entry-delete-btn';
-    deleteBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="3 6 5 6 21 6"></polyline>
-        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-      </svg>
-    `;
-    deleteBtn.onclick = (e) => {
-      e.stopPropagation();
-      if (confirm('确定要删除这篇日记吗？')) {
-        deleteEntry(dateStr);
-      }
-    };
-    
-    swipeWrap.appendChild(card);
-    swipeWrap.appendChild(deleteBtn);
-    container.appendChild(swipeWrap);
-    
-    // 绑定滑动事件
-    bindEntrySwipe(card, dateStr);
+    container.appendChild(card);
   });
 }
 
@@ -2428,49 +2390,7 @@ async function deleteEntry(dateStr) {
   }
 }
 
-// 绑定日记卡片的左滑事件
-function bindEntrySwipe(card, dateStr) {
-  let startX = 0;
-  let currentX = 0;
-  let isDragging = false;
-  
-  card.addEventListener('touchstart', (e) => {
-    startX = e.touches[0].clientX;
-    isDragging = true;
-  }, { passive: true });
-  
-  card.addEventListener('touchmove', (e) => {
-    if (!isDragging) return;
-    currentX = e.touches[0].clientX;
-    const diff = startX - currentX;
-    
-    // 左滑（从右向左）显示删除按钮
-    if (diff > 0 && diff < 80) {
-      card.style.transform = `translateX(-${diff}px)`;
-    }
-  }, { passive: true });
-  
-  card.addEventListener('touchend', () => {
-    if (!isDragging) return;
-    isDragging = false;
-    
-    const diff = startX - currentX;
-    card.style.transform = '';
-    
-    if (diff > 40) {
-      // 滑动超过阈值，显示删除按钮
-      card.classList.add('swiped-left');
-    } else {
-      // 恢复原位
-      card.classList.remove('swiped-left');
-    }
-  });
-  
-  card.addEventListener('touchcancel', () => {
-    isDragging = false;
-    card.style.transform = '';
-  });
-}
+
 
 // ===== 导出弹窗 =====
 function openExportSheet() {
@@ -2608,32 +2528,34 @@ function confirmJPGExport() {
     const offset = firstDay === 0 ? 6 : firstDay - 1;
 
   canvasContainer.innerHTML = `
-    <div style="text-align:center; margin-bottom:30px;">
-      <div style="font-size:32px; font-family:'Courier','HuiwenMincho',serif; font-weight:600; margin-bottom:8px;">${month}</div>
-      <div style="font-size:20px; color:#888; font-family:'Courier','HuiwenMincho',serif;">${year}</div>
-    </div>
-    <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:8px; text-align:center;">
-      ${WEEKDAYS_MON.map(w => `<div style="font-size:14px; color:#888; padding:8px 0; font-family:'Courier','HuiwenMincho',serif;">${w}</div>`).join('')}
-    </div>
-    <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:8px;">
-      ${Array(offset).fill('<div></div>').join('')}
-      ${Array.from({length: daysInMonth}, (_, i) => {
-        const d = i + 1;
-        const dateStr = `${year}-${String(monthIdx+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const entry = entries[dateStr];
-        const isToday = new Date(year, monthIdx, d).toDateString() === TODAY.toDateString();
-        const isFuture = new Date(year, monthIdx, d) > TODAY;
-        const cellStyle = isFuture ? 'opacity:0.3' : (isToday ? 'font-weight:700;' : '');
-        const hasEntry = entry && !isFuture;
-        const hasPhoto = hasEntry && jpgExportMode === 'photo' && entry.photos && entry.photos.length > 0;
-        const moodBg = hasEntry && jpgExportMode === 'mood' && entry.mood ? MOODS[entry.mood].hex : 'var(--bg)';
-        // 新颜色系列都是莫兰迪浅色，统一使用深色文字
-        const numStyle = hasPhoto ? 'color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'color:#1A1A1A;';
-        return `<div style="aspect-ratio:1; border-radius:8px; background:${moodBg}; display:flex; align-items:center; justify-content:center; font-size:16px; font-family:'Courier','HuiwenMincho',serif; position:relative; overflow:hidden;">
-          <span style="${cellStyle}; ${numStyle}; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:3; line-height:1;">${d}</span>
-          ${hasEntry && jpgExportMode === 'photo' && hasPhoto ? `<div style="position:absolute; inset:0; z-index:1; border-radius:8px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : ''}
-        </div>`;
-      }).join('')}
+    <div style="border-radius:16px; overflow:hidden; padding:30px; background:#fff;">
+      <div style="text-align:center; margin-bottom:30px;">
+        <div style="font-size:32px; font-family:'Courier','HuiwenMincho',serif; font-weight:600; margin-bottom:8px;">${month}</div>
+        <div style="font-size:20px; color:#888; font-family:'Courier','HuiwenMincho',serif;">${year}</div>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:8px; text-align:center;">
+        ${WEEKDAYS_MON.map(w => `<div style="font-size:14px; color:#888; padding:8px 0; font-family:'Courier','HuiwenMincho',serif;">${w}</div>`).join('')}
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:8px;">
+        ${Array(offset).fill('<div></div>').join('')}
+        ${Array.from({length: daysInMonth}, (_, i) => {
+          const d = i + 1;
+          const dateStr = `${year}-${String(monthIdx+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          const entry = entries[dateStr];
+          const isToday = new Date(year, monthIdx, d).toDateString() === TODAY.toDateString();
+          const isFuture = new Date(year, monthIdx, d) > TODAY;
+          const cellStyle = isFuture ? 'opacity:0.3' : (isToday ? 'font-weight:700;' : '');
+          const hasEntry = entry && !isFuture;
+          const hasPhoto = hasEntry && jpgExportMode === 'photo' && entry.photos && entry.photos.length > 0;
+          const moodBg = hasEntry && jpgExportMode === 'mood' && entry.mood ? MOODS[entry.mood].hex : 'var(--bg)';
+          // 新颜色系列都是莫兰迪浅色，统一使用深色文字
+          const numStyle = hasPhoto ? 'color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'color:#1A1A1A;';
+          return `<div style="aspect-ratio:1; border-radius:8px; background:${moodBg}; display:flex; align-items:center; justify-content:center; font-size:16px; font-family:'Courier','HuiwenMincho',serif; position:relative; overflow:hidden;">
+            <span style="${cellStyle}; ${numStyle}; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:3; line-height:1;">${d}</span>
+            ${hasEntry && jpgExportMode === 'photo' && hasPhoto ? `<div style="position:absolute; inset:0; z-index:1; border-radius:8px; overflow:hidden; background:url('${entry.photos[0]}') center/cover no-repeat;"></div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
     </div>
   `;
 
@@ -2658,9 +2580,34 @@ function renderAndDownload(canvasContainer, month, year, callback) {
     backgroundColor: '#fff',
     useCORS: true
   }).then(canvas => {
+    // 创建圆角裁剪后的 canvas
+    const roundedCanvas = document.createElement('canvas');
+    const ctx = roundedCanvas.getContext('2d');
+    const radius = 24; // 12px * scale(2)
+    
+    roundedCanvas.width = canvas.width;
+    roundedCanvas.height = canvas.height;
+    
+    // 绘制圆角路径
+    ctx.beginPath();
+    ctx.moveTo(radius, 0);
+    ctx.lineTo(roundedCanvas.width - radius, 0);
+    ctx.quadraticCurveTo(roundedCanvas.width, 0, roundedCanvas.width, radius);
+    ctx.lineTo(roundedCanvas.width, roundedCanvas.height - radius);
+    ctx.quadraticCurveTo(roundedCanvas.width, roundedCanvas.height, roundedCanvas.width - radius, roundedCanvas.height);
+    ctx.lineTo(radius, roundedCanvas.height);
+    ctx.quadraticCurveTo(0, roundedCanvas.height, 0, roundedCanvas.height - radius);
+    ctx.lineTo(0, radius);
+    ctx.quadraticCurveTo(0, 0, radius, 0);
+    ctx.closePath();
+    
+    // 裁剪并绘制原图
+    ctx.clip();
+    ctx.drawImage(canvas, 0, 0);
+    
     const link = document.createElement('a');
     link.download = `${month}_${year}.jpg`;
-    link.href = canvas.toDataURL('image/jpeg', 0.9);
+    link.href = roundedCanvas.toDataURL('image/jpeg', 0.9);
     link.click();
     document.body.removeChild(canvasContainer);
     if (callback) callback();
@@ -3170,7 +3117,10 @@ const authPagesHTML = `
       <!-- Logo 和欢迎语 -->
       <div class="auth-welcome">
         <div class="auth-logo">
-          <div class="auth-logo-icon">✦</div>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
         </div>
         <h1 class="auth-app-name">日常书</h1>
         <h2 class="auth-title" id="auth-title">欢迎回来</h2>
@@ -3183,15 +3133,51 @@ const authPagesHTML = `
         <button class="auth-tab" id="tab-register" onclick="switchAuthMode('register')">注册</button>
       </div>
       
+      <!-- 表单容器 -->
+      <div class="auth-form-container">
+      
       <!-- 登录表单 -->
       <div id="auth-login-form" class="auth-form">
-        <div class="form-group">
-          <input type="email" id="auth-email" placeholder="请输入邮箱">
-          <span class="input-icon">✉</span>
+        <!-- 登录方式切换 -->
+        <div class="auth-method-tabs">
+          <button class="auth-method-tab active" id="method-email" onclick="switchAuthMethod('email')">邮箱</button>
+          <button class="auth-method-tab" id="method-phone" onclick="switchAuthMethod('phone')">手机号</button>
         </div>
-        <div class="form-group">
-          <input type="password" id="auth-password" placeholder="请输入密码">
-          <span class="input-icon" onclick="togglePasswordVisibility('auth-password', this)">👁</span>
+        <div id="email-login-fields">
+          <div class="form-group">
+            <input type="email" id="auth-email" placeholder="请输入邮箱">
+            <span class="input-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                <polyline points="2,7 12,13 22,7"></polyline>
+              </svg>
+            </span>
+          </div>
+          <div class="form-group">
+            <input type="password" id="auth-password" placeholder="请输入密码">
+            <span class="input-icon" onclick="togglePasswordVisibility('auth-password', this)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </span>
+          </div>
+        </div>
+        <div id="phone-login-fields" style="display:none;">
+          <div class="form-group">
+            <input type="tel" id="auth-phone" placeholder="请输入手机号" maxlength="11">
+            <span class="input-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+              </svg>
+            </span>
+          </div>
+          <div class="form-group verify-code-group" id="verify-code-group">
+            <input type="text" id="auth-code" placeholder="请输入验证码" maxlength="6">
+            <button class="btn-send-code" id="btn-send-code" onclick="sendPhoneCode()">获取验证码</button>
+          </div>
+          <div id="recaptcha-container"></div>
         </div>
         <div class="form-options">
           <label class="remember-me">
@@ -3199,7 +3185,7 @@ const authPagesHTML = `
             <span class="check-circle"></span>
             <span>记住我</span>
           </label>
-          <a href="#" class="forgot-link" onclick="showToast('请联系管理员重置密码'); return false;">忘记密码?</a>
+          <a href="#" class="forgot-link" id="forgot-link" onclick="showToast('请联系管理员重置密码'); return false;">忘记密码?</a>
         </div>
         <div class="form-error" id="auth-error"></div>
         <button class="btn-auth-primary" onclick="handleAuthSubmit()">登录</button>
@@ -3207,23 +3193,68 @@ const authPagesHTML = `
       
       <!-- 注册表单 -->
       <div id="auth-register-form" class="auth-form" style="display:none;">
-        <div class="form-group">
-          <input type="email" id="register-email" placeholder="请输入邮箱">
-          <span class="input-icon">✉</span>
+        <!-- 注册方式切换 -->
+        <div class="auth-method-tabs">
+          <button class="auth-method-tab active" id="reg-method-email" onclick="switchRegisterMethod('email')">邮箱注册</button>
+          <button class="auth-method-tab" id="reg-method-phone" onclick="switchRegisterMethod('phone')">手机号注册</button>
         </div>
-        <div class="form-group">
-          <input type="password" id="register-password" placeholder="设置密码（至少6位）">
-          <span class="input-icon" onclick="togglePasswordVisibility('register-password', this)">👁</span>
+        
+        <!-- 邮箱注册 -->
+        <div id="email-register-fields">
+          <div class="form-group">
+            <input type="email" id="register-email" placeholder="请输入邮箱">
+            <span class="input-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                <polyline points="2,7 12,13 22,7"></polyline>
+              </svg>
+            </span>
+          </div>
+          <div class="form-group">
+            <input type="password" id="register-password" placeholder="设置密码（至少6位）">
+            <span class="input-icon" onclick="togglePasswordVisibility('register-password', this)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </span>
+          </div>
+          <div class="form-group">
+            <input type="password" id="register-password2" placeholder="确认密码">
+            <span class="input-icon" onclick="togglePasswordVisibility('register-password2', this)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </span>
+          </div>
         </div>
-        <div class="form-group">
-          <input type="password" id="register-password2" placeholder="确认密码">
-          <span class="input-icon" onclick="togglePasswordVisibility('register-password2', this)">👁</span>
+        
+        <!-- 手机号注册 -->
+        <div id="phone-register-fields" style="display:none;">
+          <div class="form-group">
+            <input type="tel" id="reg-phone" placeholder="请输入手机号" maxlength="11">
+            <span class="input-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+              </svg>
+            </span>
+          </div>
+          <div class="form-group verify-code-group" id="reg-verify-group">
+            <input type="text" id="reg-code" placeholder="请输入验证码" maxlength="6">
+            <button class="btn-send-code" id="btn-reg-send-code" onclick="sendRegisterPhoneCode()">获取验证码</button>
+          </div>
+          <div id="reg-recaptcha-container"></div>
         </div>
+        
         <div class="form-error" id="register-error"></div>
         <button class="btn-auth-primary" onclick="handleAuthSubmit()">注册</button>
       </div>
       
       <button class="btn-text" onclick="handleAnonymousLogin()">游客模式</button>
+      
+      </div><!-- /auth-form-container -->
     </div>
   </div>
 </div>
@@ -3287,6 +3318,194 @@ function closeAccountModal() {
   document.getElementById('account-modal').style.display = 'none';
 }
 
+// 当前登录方式
+let currentAuthMethod = 'email';
+let currentRegisterMethod = 'email';
+let regConfirmationResult = null;
+let regRecaptchaVerifier = null;
+
+// 切换注册方式
+async function switchRegisterMethod(method) {
+  currentRegisterMethod = method;
+  const tabEmail = document.getElementById('reg-method-email');
+  const tabPhone = document.getElementById('reg-method-phone');
+  const emailFields = document.getElementById('email-register-fields');
+  const phoneFields = document.getElementById('phone-register-fields');
+  
+  if (method === 'email') {
+    tabEmail.classList.add('active');
+    tabPhone.classList.remove('active');
+    emailFields.style.display = 'block';
+    phoneFields.style.display = 'none';
+  } else {
+    tabEmail.classList.remove('active');
+    tabPhone.classList.add('active');
+    emailFields.style.display = 'none';
+    phoneFields.style.display = 'block';
+    await initRegRecaptcha();
+  }
+  
+  // 清除错误信息
+  document.getElementById('register-error').textContent = '';
+}
+
+// 初始化注册页面的 reCAPTCHA
+async function initRegRecaptcha() {
+  if (regRecaptchaVerifier) return;
+  try {
+    // 确保 Firebase 已准备好
+    await waitForFirebase();
+    const { RecaptchaVerifier } = window.firebaseApp;
+    regRecaptchaVerifier = new RecaptchaVerifier(window.auth, 'reg-recaptcha-container', {
+      'size': 'invisible',
+      'callback': (response) => {
+        console.log('注册页 reCAPTCHA 验证成功');
+      }
+    });
+  } catch (e) {
+    console.error('注册页 reCAPTCHA 初始化失败:', e);
+  }
+}
+
+// 发送注册验证码
+async function sendRegisterPhoneCode() {
+  const phoneInput = document.getElementById('reg-phone');
+  const phone = phoneInput.value.trim();
+  const btn = document.getElementById('btn-reg-send-code');
+  const errorEl = document.getElementById('register-error');
+  
+  if (!phone || phone.length !== 11) {
+    errorEl.textContent = '请输入正确的手机号';
+    return;
+  }
+  
+  try {
+    const { signInWithPhoneNumber } = window.firebaseApp;
+    const formattedPhone = '+86' + phone;
+    
+    // 确保 reCAPTCHA 已初始化
+    if (!regRecaptchaVerifier) {
+      await initRegRecaptcha();
+    }
+    
+    regConfirmationResult = await signInWithPhoneNumber(window.auth, formattedPhone, regRecaptchaVerifier);
+    
+    // 倒计时
+    let count = 60;
+    btn.disabled = true;
+    btn.textContent = `${count}s`;
+    const timer = setInterval(() => {
+      count--;
+      if (count <= 0) {
+        clearInterval(timer);
+        btn.disabled = false;
+        btn.textContent = '获取验证码';
+      } else {
+        btn.textContent = `${count}s`;
+      }
+    }, 1000);
+    
+    errorEl.textContent = '';
+    showToast('验证码已发送');
+  } catch (err) {
+    console.error('发送验证码失败:', err);
+    errorEl.textContent = getErrorMessage(err.code) || '发送失败，请重试';
+  }
+}
+
+// 切换登录方式
+async function switchAuthMethod(method) {
+  currentAuthMethod = method;
+  const tabEmail = document.getElementById('method-email');
+  const tabPhone = document.getElementById('method-phone');
+  const emailFields = document.getElementById('email-login-fields');
+  const phoneFields = document.getElementById('phone-login-fields');
+  const forgotLink = document.getElementById('forgot-link');
+  
+  if (method === 'email') {
+    tabEmail.classList.add('active');
+    tabPhone.classList.remove('active');
+    emailFields.style.display = 'block';
+    phoneFields.style.display = 'none';
+    if (forgotLink) forgotLink.style.display = 'block';
+  } else {
+    tabEmail.classList.remove('active');
+    tabPhone.classList.add('active');
+    emailFields.style.display = 'none';
+    phoneFields.style.display = 'block';
+    if (forgotLink) forgotLink.style.display = 'none';
+    // 初始化 reCAPTCHA
+    await initRecaptcha();
+  }
+  
+  // 清除错误信息
+  document.getElementById('auth-error').textContent = '';
+}
+
+// 初始化 reCAPTCHA
+async function initRecaptcha() {
+  if (recaptchaVerifier) return;
+  try {
+    // 确保 Firebase 已准备好
+    await waitForFirebase();
+    const { RecaptchaVerifier } = window.firebaseApp;
+    recaptchaVerifier = new RecaptchaVerifier(window.auth, 'recaptcha-container', {
+      'size': 'invisible',
+      'callback': (response) => {
+        console.log('reCAPTCHA 验证成功');
+      }
+    });
+  } catch (e) {
+    console.error('reCAPTCHA 初始化失败:', e);
+  }
+}
+
+// 发送手机验证码
+async function sendPhoneCode() {
+  const phoneInput = document.getElementById('auth-phone');
+  const phone = phoneInput.value.trim();
+  const btn = document.getElementById('btn-send-code');
+  const errorEl = document.getElementById('auth-error');
+  
+  if (!phone || phone.length !== 11) {
+    errorEl.textContent = '请输入正确的手机号';
+    return;
+  }
+  
+  try {
+    const { signInWithPhoneNumber } = window.firebaseApp;
+    const formattedPhone = '+86' + phone;
+    
+    // 确保 reCAPTCHA 已初始化
+    if (!recaptchaVerifier) {
+      await initRecaptcha();
+    }
+    
+    confirmationResult = await signInWithPhoneNumber(window.auth, formattedPhone, recaptchaVerifier);
+    
+    // 倒计时
+    let count = 60;
+    btn.disabled = true;
+    btn.textContent = `${count}s`;
+    const timer = setInterval(() => {
+      count--;
+      if (count <= 0) {
+        clearInterval(timer);
+        btn.disabled = false;
+        btn.textContent = '获取验证码';
+      } else {
+        btn.textContent = `${count}s`;
+      }
+    }, 1000);
+    
+    errorEl.textContent = '';
+    showToast('验证码已发送');
+  } catch (err) {
+    console.error('发送验证码失败:', err);
+    errorEl.textContent = getErrorMessage(err.code) || '发送失败，请重试';
+  }
+}
+
 // 切换登录/注册模式
 function switchAuthMode(mode) {
   currentAuthMode = mode;
@@ -3296,6 +3515,7 @@ function switchAuthMode(mode) {
   const registerForm = document.getElementById('auth-register-form');
   const title = document.getElementById('auth-title');
   const subtitle = document.getElementById('auth-subtitle');
+  const methodTabs = document.querySelector('.auth-method-tabs');
   
   if (mode === 'login') {
     tabLogin.classList.add('active');
@@ -3304,6 +3524,7 @@ function switchAuthMode(mode) {
     registerForm.style.display = 'none';
     title.textContent = '欢迎回来';
     subtitle.textContent = '记录每一天的美好';
+    if (methodTabs) methodTabs.style.display = 'flex';
   } else {
     tabLogin.classList.remove('active');
     tabRegister.classList.add('active');
@@ -3311,6 +3532,7 @@ function switchAuthMode(mode) {
     registerForm.style.display = 'block';
     title.textContent = '创建账号';
     subtitle.textContent = '开始记录你的生活';
+    if (methodTabs) methodTabs.style.display = 'none';
   }
   
   // 清除错误信息
@@ -3321,21 +3543,93 @@ function switchAuthMode(mode) {
 // 密码可见性切换
 function togglePasswordVisibility(inputId, iconEl) {
   const input = document.getElementById(inputId);
-  if (input.type === 'password') {
-    input.type = 'text';
-    iconEl.textContent = '🙈';
+  const isPassword = input.type === 'password';
+  input.type = isPassword ? 'text' : 'password';
+  
+  // 更新 SVG 图标
+  if (isPassword) {
+    // 显示"闭眼"图标
+    iconEl.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+      <line x1="1" y1="1" x2="23" y2="23"></line>
+    </svg>`;
   } else {
-    input.type = 'password';
-    iconEl.textContent = '👁';
+    // 显示"睁眼"图标
+    iconEl.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+      <circle cx="12" cy="12" r="3"></circle>
+    </svg>`;
   }
 }
 
 // 提交处理
 async function handleAuthSubmit() {
   if (currentAuthMode === 'login') {
-    await handleEmailLogin();
+    if (currentAuthMethod === 'email') {
+      await handleEmailLogin();
+    } else {
+      await handlePhoneLogin();
+    }
   } else {
-    await handleEmailRegister();
+    if (currentRegisterMethod === 'email') {
+      await handleEmailRegister();
+    } else {
+      await handlePhoneRegister();
+    }
+  }
+}
+
+// 手机号注册
+async function handlePhoneRegister() {
+  const code = document.getElementById('reg-code').value.trim();
+  const errorEl = document.getElementById('register-error');
+  
+  if (!code) {
+    errorEl.textContent = '请输入验证码';
+    return;
+  }
+  
+  if (!regConfirmationResult) {
+    errorEl.textContent = '请先获取验证码';
+    return;
+  }
+  
+  try {
+    await regConfirmationResult.confirm(code);
+    setTimeout(() => {
+      showSettingsPage();
+      showToast('注册成功');
+    }, 100);
+  } catch (err) {
+    console.error('手机号注册失败:', err);
+    errorEl.textContent = getErrorMessage(err.code) || '验证码错误';
+  }
+}
+
+// 手机号登录
+async function handlePhoneLogin() {
+  const code = document.getElementById('auth-code').value.trim();
+  const errorEl = document.getElementById('auth-error');
+  
+  if (!code) {
+    errorEl.textContent = '请输入验证码';
+    return;
+  }
+  
+  if (!confirmationResult) {
+    errorEl.textContent = '请先获取验证码';
+    return;
+  }
+  
+  try {
+    await confirmationResult.confirm(code);
+    setTimeout(() => {
+      showSettingsPage();
+      showToast('登录成功');
+    }, 100);
+  } catch (err) {
+    console.error('验证码登录失败:', err);
+    errorEl.textContent = getErrorMessage(err.code) || '验证码错误';
   }
 }
 
@@ -3427,7 +3721,13 @@ function getErrorMessage(code) {
     'auth/invalid-verification-code': '验证码错误',
     'auth/code-expired': '验证码已过期',
     'auth/quota-exceeded': '短信配额已用完',
-    'auth/requires-recent-login': '请重新登录'
+    'auth/requires-recent-login': '请重新登录',
+    'auth/invalid-phone-number': '手机号格式不正确',
+    'auth/missing-phone-number': '请输入手机号',
+    'auth/captcha-check-failed': '验证失败，请重试',
+    'auth/invalid-app-credential': '应用验证失败',
+    'auth/unauthorized-continue-uri': '未授权的域名',
+    'auth/invalid-verification-id': '验证ID无效'
   };
   return messages[code] || '操作失败';
 }
@@ -3520,12 +3820,21 @@ const authStyles = `
 .form-error {
   color: #ff6b6b;
   font-size: 13px;
-  margin-bottom: 12px;
-  min-height: 18px;
-  padding: 10px;
-  background: rgba(255, 107, 107, 0.15);
+  margin-bottom: 0;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
   border-radius: 8px;
   text-align: center;
+  line-height: 0;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+.form-error:not(:empty) {
+  margin-bottom: 12px;
+  min-height: 18px;
+  line-height: 1.4;
+  padding: 4px 0;
 }
 .btn-primary {
   width: 100%;
@@ -3605,13 +3914,13 @@ const authStyles = `
   justify-content: center;
 }
 
-/* 登录注册页面 */
+/* 登录注册页面 - 浅色简约风格 */
 .auth-page {
   flex: 1;
   display: flex;
   flex-direction: column;
   padding: 0 24px;
-  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  background: #FAF9F6;
   min-height: 100vh;
 }
 .auth-header {
@@ -3619,26 +3928,45 @@ const authStyles = `
 }
 .auth-back {
   font-size: 32px;
-  color: white;
+  color: #333;
   cursor: pointer;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .auth-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   max-width: 360px;
   margin: 0 auto;
   width: 100%;
+  padding-top: 40px;
 }
 .auth-welcome {
   text-align: center;
   margin-bottom: 28px;
+  flex-shrink: 0;
+}
+.auth-tabs {
+  display: flex;
+  background: #f0f0f0;
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 24px;
+  flex-shrink: 0;
+}
+.auth-form-container {
+  flex: 1;
+  overflow-y: auto;
 }
 .auth-logo {
   width: 64px;
   height: 64px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: transparent;
+  border: 2px solid #333;
   border-radius: 16px;
   display: flex;
   align-items: center;
@@ -3646,32 +3974,25 @@ const authStyles = `
   margin: 0 auto 16px;
 }
 .auth-logo-icon {
-  font-size: 32px;
-  color: white;
+  font-size: 28px;
+  color: #333;
 }
 .auth-app-name {
   font-size: 20px;
   font-weight: 600;
-  color: white;
+  color: #333;
   margin: 0 0 8px 0;
 }
 .auth-title {
   font-size: 22px;
   font-weight: 700;
-  color: white;
+  color: #333;
   margin: 0 0 6px 0;
 }
 .auth-subtitle {
   font-size: 14px;
-  color: rgba(255,255,255,0.7);
+  color: #888;
   margin: 0;
-}
-.auth-tabs {
-  display: flex;
-  background: rgba(255,255,255,0.1);
-  border-radius: 10px;
-  padding: 4px;
-  margin-bottom: 24px;
 }
 .auth-tab {
   flex: 1;
@@ -3682,13 +4003,16 @@ const authStyles = `
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  color: rgba(255,255,255,0.6);
+  color: #666;
   transition: all 0.25s ease;
 }
 .auth-tab.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #333;
   color: white;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.auth-form {
+  /* 表单高度自适应 */
 }
 .auth-form .form-group {
   position: relative;
@@ -3697,22 +4021,22 @@ const authStyles = `
 .auth-form input {
   width: 100%;
   padding: 14px 44px 14px 16px;
-  border: 1.5px solid rgba(255,255,255,0.2);
+  border: 1px solid #e0e0e0;
   border-radius: 10px;
   font-size: 15px;
-  background: rgba(255,255,255,0.1);
-  color: white;
+  background: white;
+  color: #333;
   box-sizing: border-box;
   transition: all 0.2s;
 }
 .auth-form input:focus {
   outline: none;
-  border-color: #667eea;
-  background: rgba(255,255,255,0.15);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+  border-color: #333;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
 }
 .auth-form input::placeholder {
-  color: rgba(255,255,255,0.5);
+  color: #aaa;
 }
 .auth-form .input-icon {
   position: absolute;
@@ -3720,24 +4044,24 @@ const authStyles = `
   top: 50%;
   transform: translateY(-50%);
   font-size: 16px;
-  opacity: 0.5;
+  color: #999;
   cursor: pointer;
 }
 .auth-form .input-icon:hover {
-  opacity: 1;
+  color: #333;
 }
 .form-options {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
   font-size: 13px;
 }
 .remember-me {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: rgba(255,255,255,0.7);
+  color: #666;
   cursor: pointer;
 }
 .remember-me input[type="checkbox"] {
@@ -3746,7 +4070,7 @@ const authStyles = `
 .check-circle {
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(255,255,255,0.3);
+  border: 2px solid #ccc;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -3754,8 +4078,8 @@ const authStyles = `
   transition: all 0.2s;
 }
 .remember-me input:checked + .check-circle {
-  background: #667eea;
-  border-color: #667eea;
+  background: #333;
+  border-color: #333;
 }
 .remember-me input:checked + .check-circle::after {
   content: '✓';
@@ -3763,13 +4087,16 @@ const authStyles = `
   font-size: 11px;
 }
 .forgot-link {
-  color: #667eea;
+  color: #666;
   text-decoration: none;
+}
+.forgot-link:hover {
+  color: #333;
 }
 .btn-auth-primary {
   width: 100%;
   padding: 14px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #333;
   color: white;
   border: none;
   border-radius: 10px;
@@ -3777,19 +4104,76 @@ const authStyles = `
   font-weight: 600;
   cursor: pointer;
   transition: all 0.25s ease;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 .btn-auth-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 25px rgba(102, 126, 234, 0.6);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  background: #444;
 }
 .btn-auth-primary:active {
   transform: translateY(0);
+  background: #222;
 }
 .btn-large {
   padding: 16px;
   font-size: 17px;
   border-radius: 12px;
+}
+
+/* 登录方式切换 */
+.auth-method-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+.auth-method-tab {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  color: #999;
+  cursor: pointer;
+  padding: 4px 0;
+  position: relative;
+  transition: color 0.2s;
+}
+.auth-method-tab.active {
+  color: #333;
+}
+.auth-method-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #333;
+  border-radius: 1px;
+}
+
+/* 验证码输入组 */
+.verify-code-group {
+  display: flex;
+  gap: 12px;
+}
+.verify-code-group input {
+  flex: 1;
+}
+.btn-send-code {
+  padding: 0 16px;
+  background: #333;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.btn-send-code:disabled {
+  background: #ccc;
+  cursor: not-allowed;
 }
 </style>
 `;
