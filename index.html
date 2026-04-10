@@ -958,6 +958,13 @@
       <span class="settings-row-label">本地备份</span>
       <div class="settings-row-right"><span class="settings-arrow">›</span></div>
     </div>
+    <div class="settings-row" onclick="manualSync()">
+      <span class="settings-row-label">立即同步</span>
+      <div class="settings-row-right">
+        <span id="sync-status-text" style="font-size:13px; color:var(--text-secondary); margin-right:8px;"></span>
+        <span class="settings-arrow">›</span>
+      </div>
+    </div>
   </div>
   <div style="padding: 16px 20px; font-size:13px; color:var(--text-secondary); line-height:1.6;">
     开启云同步后，日记数据将加密存储至云端，可在多设备间访问。未登录时仅本地保存。
@@ -1199,6 +1206,160 @@ const MOODS = {
 // 日记数据（从 Firebase 加载，不再使用模拟数据）
 let entries = {};
 
+// ===== IndexedDB 本地存储 =====
+const DB_NAME = 'DailyDiaryDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'entries';
+const SETTINGS_STORE = 'settings';
+
+let dbInstance = null;
+
+// 打开 IndexedDB
+function openLocalDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      dbInstance = request.result;
+      resolve(dbInstance);
+    };
+    
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      // 日记存储
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        const store = db.createObjectStore(STORE_NAME, { keyPath: 'date' });
+        store.createIndex('updatedAt', 'updatedAt', { unique: false });
+      }
+      // 设置存储
+      if (!db.objectStoreNames.contains(SETTINGS_STORE)) {
+        db.createObjectStore(SETTINGS_STORE, { keyPath: 'key' });
+      }
+    };
+  });
+}
+
+// 获取本地日记列表
+async function getLocalEntries() {
+  if (!dbInstance) await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = dbInstance.transaction([STORE_NAME], 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.getAll();
+    
+    request.onsuccess = () => {
+      const result = {};
+      request.result.forEach(item => {
+        result[item.date] = item;
+      });
+      resolve(result);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// 保存单条日记到本地
+async function saveLocalEntry(entry) {
+  if (!dbInstance) await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = dbInstance.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const data = {
+      ...entry,
+      updatedAt: Date.now(),
+      synced: false
+    };
+    const request = store.put(data);
+    
+    request.onsuccess = () => resolve(data);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// 删除本地日记
+async function deleteLocalEntry(date) {
+  if (!dbInstance) await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = dbInstance.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.delete(date);
+    
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// 标记日记为已同步
+async function markEntrySynced(date) {
+  if (!dbInstance) await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = dbInstance.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const getReq = store.get(date);
+    
+    getReq.onsuccess = () => {
+      if (getReq.result) {
+        getReq.result.synced = true;
+        const putReq = store.put(getReq.result);
+        putReq.onsuccess = () => resolve();
+        putReq.onerror = () => reject(putReq.error);
+      } else {
+        resolve();
+      }
+    };
+    getReq.onerror = () => reject(getReq.error);
+  });
+}
+
+// 获取设置
+async function getLocalSetting(key, defaultValue = null) {
+  if (!dbInstance) await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = dbInstance.transaction([SETTINGS_STORE], 'readonly');
+    const store = transaction.objectStore(SETTINGS_STORE);
+    const request = store.get(key);
+    
+    request.onsuccess = () => resolve(request.result?.value ?? defaultValue);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// 保存设置
+async function setLocalSetting(key, value) {
+  if (!dbInstance) await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = dbInstance.transaction([SETTINGS_STORE], 'readwrite');
+    const store = transaction.objectStore(SETTINGS_STORE);
+    const request = store.put({ key, value });
+    
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// 获取待同步的日记
+async function getUnsyncedEntries() {
+  if (!dbInstance) await openLocalDB();
+  return new Promise((resolve, reject) => {
+    const transaction = dbInstance.transaction([STORE_NAME], 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.getAll();
+    
+    request.onsuccess = () => {
+      const unsynced = request.result.filter(item => !item.synced);
+      resolve(unsynced);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// 检查是否有待同步数据
+async function hasUnsyncedData() {
+  const unsynced = await getUnsyncedEntries();
+  return unsynced.length > 0;
+}
+
 // ===== 用户信息 =====
 const DEFAULT_AVATAR = '🙂';
 let userProfile = {
@@ -1354,8 +1515,13 @@ const TODAY = new Date();
 
 // ===== 页面切换 =====
 function goTo(pageId) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById(pageId).classList.add('active');
+  document.querySelectorAll('.page').forEach(p => {
+    p.classList.remove('active');
+    p.style.display = ''; // 清除内联样式，让 CSS 控制
+  });
+  const el = document.getElementById(pageId);
+  el.classList.add('active');
+  el.style.display = ''; // 确保没有内联 display 干扰
   pageStack.push(pageId);
   window.scrollTo(0, 0);
 }
@@ -1363,9 +1529,13 @@ function goTo(pageId) {
 function goBack() {
   pageStack.pop();
   const prev = pageStack[pageStack.length - 1] || 'page-home';
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => {
+    p.classList.remove('active');
+    p.style.display = ''; // 清除内联样式
+  });
   const el = document.getElementById(prev);
   el.classList.add('active');
+  el.style.display = ''; // 确保没有内联 display 干扰
   el.style.animation = 'slideInLeft 0.25s ease';
   setTimeout(() => el.style.animation = '', 300);
   if (prev === 'page-home') renderHome();
@@ -1380,12 +1550,145 @@ function showToast(msg) {
 }
 
 // ===== 切换 =====
-function toggleSwitch(key) {
+async function toggleSwitch(key) {
   const el = document.getElementById('toggle-' + key);
   el.classList.toggle('on');
-  if (key === 'cloud' && el.classList.contains('on')) {
-    showToast('请先登录以使用云同步');
-    setTimeout(() => el.classList.remove('on'), 100);
+  const isOn = el.classList.contains('on');
+  
+  if (key === 'cloud' && isOn) {
+    // 检查是否已登录
+    if (!userProfile.isLoggedIn) {
+      showToast('请先登录以使用云同步');
+      setTimeout(() => el.classList.remove('on'), 100);
+      await setLocalSetting('cloudSync', false);
+      return;
+    }
+    // 已登录，开启云同步
+    await setLocalSetting('cloudSync', true);
+    showToast('已开启云同步');
+  } else if (key === 'auto') {
+    // 保存自动同步设置
+    await setLocalSetting('autoSync', isOn);
+    showToast(isOn ? '已开启自动同步' : '已关闭自动同步');
+  } else if (key === 'cloud' && !isOn) {
+    // 关闭云同步
+    await setLocalSetting('cloudSync', false);
+    showToast('已关闭云同步');
+  }
+}
+
+// 加载同步设置
+async function loadSyncSettings() {
+  const autoSync = await getLocalSetting('autoSync', false);
+  const cloudSync = await getLocalSetting('cloudSync', false);
+  
+  const autoToggle = document.getElementById('toggle-auto');
+  const cloudToggle = document.getElementById('toggle-cloud');
+  
+  if (autoToggle) {
+    if (autoSync) autoToggle.classList.add('on');
+    else autoToggle.classList.remove('on');
+  }
+  if (cloudToggle) {
+    if (cloudSync) cloudToggle.classList.add('on');
+    else cloudToggle.classList.remove('on');
+  }
+}
+
+// 更新同步状态显示
+function updateSyncStatus(status) {
+  const indicator = document.getElementById('sync-indicator');
+  const icon = document.getElementById('sync-icon');
+  const text = document.getElementById('sync-text');
+  const syncStatusText = document.getElementById('sync-status-text');
+  
+  const statusMap = {
+    'synced': { icon: '✓', text: '已同步', color: '#7CB342' },
+    'pending': { icon: '↑', text: '待同步', color: '#FFA726' },
+    'syncing': { icon: '⟳', text: '同步中', color: '#42A5F5' },
+    'offline': { icon: '—', text: '离线', color: '#999' },
+    'error': { icon: '!', text: '同步失败', color: '#EF5350' }
+  };
+  
+  const config = statusMap[status] || statusMap['offline'];
+  
+  // 更新首页指示器（如果存在）
+  if (indicator && icon && text) {
+    icon.textContent = config.icon;
+    text.textContent = config.text;
+    indicator.style.color = config.color;
+  }
+  
+  // 更新同步页面的状态文本
+  if (syncStatusText) {
+    syncStatusText.textContent = config.text;
+    syncStatusText.style.color = config.color;
+  }
+}
+
+// 手动同步
+async function manualSync() {
+  showToast('正在同步...');
+  
+  try {
+    await waitForFirebase();
+    const { db, collection, getDocs, doc, setDoc, deleteDoc, query, where } = window.firebaseApp;
+    const uid = getCurrentUid();
+    
+    let uploaded = 0;
+    let downloaded = 0;
+    let deleted = 0;
+    
+    // 1. 获取本地待同步数据
+    const localEntries = await getLocalEntries();
+    
+    // 2. 上传到云端（未同步的本地数据）
+    for (const [date, entry] of Object.entries(localEntries)) {
+      if (!entry.synced && !entry._deleted) {
+        await setDoc(doc(db, 'entries', `${uid}_${date}`), { ...entry, uid });
+        await markEntrySynced(date);
+        uploaded++;
+      } else if (entry._deleted) {
+        // 删除云端数据
+        const q = query(collection(db, 'entries'), where('uid', '==', uid), where('date', '==', date));
+        const snapshot = await getDocs(q);
+        for (const docSnap of snapshot.docs) {
+          await deleteDoc(docSnap.ref);
+        }
+        await deleteLocalEntry(date);
+        deleted++;
+      }
+    }
+    
+    // 3. 从云端下载新数据
+    const q = query(collection(db, 'entries'), where('uid', '==', uid));
+    const querySnapshot = await getDocs(q);
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.date && !data._deleted) {
+        const localData = localEntries[data.date];
+        const cloudTime = new Date(data.updatedAt || 0).getTime();
+        const localTime = localData?.updatedAt ? new Date(localData.updatedAt).getTime() : 0;
+        
+        if (!localData || cloudTime > localTime) {
+          entries[data.date] = data;
+          saveLocalEntry({ ...data, synced: true });
+          downloaded++;
+        }
+      }
+    });
+    
+    // 刷新界面
+    renderHome();
+    updateSyncStatus('synced');
+    
+    showToast(`同步完成：上传${uploaded}条，下载${downloaded}条，删除${deleted}条`);
+    
+  } catch (err) {
+    console.error('同步失败:', err);
+    showToast('同步失败: ' + err.message);
+    updateSyncStatus('error');
   }
 }
 
@@ -1483,39 +1786,71 @@ async function initTestData(forceReset = false) {
   }
 }
 
-// ===== 首页渲染 =====
+// ===== 加载日记数据（本地优先 + 云端合并）=====
 async function loadEntriesFromFirebase() {
   try {
-    // 先初始化测试数据（如果数据库为空）
-    await initTestData();
+    // 1. 先从本地 IndexedDB 加载
+    const localEntries = await getLocalEntries();
+    entries = { ...localEntries };
+    console.log('从本地加载了', Object.keys(localEntries).length, '条日记');
     
-    const { db, collection, getDocs, query, where } = window.firebaseApp;
-    const uid = getCurrentUid();
-    // 按用户筛选数据
-    const q = query(collection(db, 'entries'), where('uid', '==', uid));
-    const querySnapshot = await getDocs(q);
-    entries = {};
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data.date) {
-        entries[data.date] = {
-          mood: data.mood,
-          text: data.text,
-          photos: data.photos || []
-        };
+    // 2. 尝试从云端加载并合并
+    try {
+      await waitForFirebase();
+      const { db, collection, getDocs, query, where } = window.firebaseApp;
+      const uid = getCurrentUid();
+      const q = query(collection(db, 'entries'), where('uid', '==', uid));
+      const querySnapshot = await getDocs(q);
+      
+      let cloudCount = 0;
+      let mergedCount = 0;
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.date && !data._deleted) {
+          cloudCount++;
+          const localData = localEntries[data.date];
+          
+          // 合并策略：比较 updatedAt，保留较新的
+          const cloudTime = new Date(data.updatedAt || 0).getTime();
+          const localTime = localData?.updatedAt ? new Date(localData.updatedAt).getTime() : 0;
+          
+          if (!localData || cloudTime > localTime) {
+            // 云端较新，更新本地
+            entries[data.date] = data;
+            saveLocalEntry({ ...data, synced: true });
+            mergedCount++;
+          }
+        }
+      });
+      
+      console.log(`云端有 ${cloudCount} 条日记，合并了 ${mergedCount} 条`);
+      
+      // 检查是否有待同步的本地数据
+      const hasPending = await hasUnsyncedData();
+      updateSyncStatus(hasPending ? 'pending' : 'synced');
+      
+    } catch (cloudErr) {
+      console.log('云端加载失败，使用本地数据:', cloudErr.message);
+      updateSyncStatus('offline');
+    }
+    
+    // 3. 如果本地和云端都为空，初始化测试数据（仅匿名用户）
+    if (Object.keys(entries).length === 0 && !userProfile.isLoggedIn) {
+      console.log('无数据，初始化测试数据');
+      for (const item of TEST_DATA) {
+        await saveLocalEntry({ ...item, uid: 'anonymous' });
+        entries[item.date] = item;
       }
-    });
+    }
+    
     renderHome();
   } catch (error) {
     console.error('加载数据失败:', error);
-    // 本地模式：Firebase 不可用时直接使用测试数据
+    // 最后的兜底：使用测试数据
     entries = {};
     TEST_DATA.forEach(item => {
-      entries[item.date] = {
-        mood: item.mood,
-        text: item.text,
-        photos: item.photos || []
-      };
+      entries[item.date] = item;
     });
     renderHome();
   }
@@ -2205,7 +2540,7 @@ async function saveEntry() {
     }
 
     console.log('照片处理完成，共', photoUrls.length, '张');
-    showToast('正在写入数据库...');
+    showToast('正在保存...');
 
     const uid = getCurrentUid();
     
@@ -2219,21 +2554,35 @@ async function saveEntry() {
       updatedAt: new Date().toISOString()
     };
 
-    // 如果 Firebase 可用，保存到云端
-    if (firebaseAvailable && window.firebaseApp && window.firebaseApp.db) {
-      console.log('使用 setDoc 保存到 Firebase...');
-      const { db, doc, setDoc } = window.firebaseApp;
-      await setDoc(doc(db, 'entries', `${uid}_${editingDate}`), entryData, { merge: true });
-      console.log('setDoc 调用成功');
-    } else {
-      console.log('本地模式：仅保存到内存');
-    }
+    // 1. 先保存到本地 IndexedDB
+    await saveLocalEntry(entryData);
+    console.log('已保存到本地 IndexedDB');
 
-    // 更新本地数据
+    // 2. 更新内存中的数据
     entries[editingDate] = entryData;
 
+    // 3. 如果 Firebase 可用且开启了自动同步，同步到云端
+    const autoSync = await getLocalSetting('autoSync', false);
+    if (firebaseAvailable && window.firebaseApp && window.firebaseApp.db && autoSync) {
+      console.log('自动同步开启，同步到 Firebase...');
+      try {
+        const { db, doc, setDoc } = window.firebaseApp;
+        await setDoc(doc(db, 'entries', `${uid}_${editingDate}`), entryData, { merge: true });
+        await markEntrySynced(editingDate);
+        console.log('云端同步成功');
+        showToast('已保存并同步');
+      } catch (syncErr) {
+        console.error('云端同步失败:', syncErr);
+        showToast('已保存到本地，同步失败');
+        updateSyncStatus('pending');
+      }
+    } else {
+      console.log('自动同步关闭或 Firebase 不可用，仅保存本地');
+      showToast('已保存到本地');
+      updateSyncStatus('pending');
+    }
+
     clearTimeout(saveTimeout);
-    showToast('已保存');
     console.log('=== 保存完成 ===');
     
     setTimeout(() => {
@@ -2324,22 +2673,33 @@ async function deleteCurrentEntry() {
   showToast('正在删除...');
   
   try {
-    await waitForFirebase();
-    // 从 Firebase 删除
-    if (window.firebaseApp && window.firebaseApp.db) {
-      const { db, collection, query, where, getDocs, doc, deleteDoc } = window.firebaseApp;
-      const uid = getCurrentUid();
-      // 按用户和日期删除
-      const q = query(collection(db, 'entries'), where('uid', '==', uid), where('date', '==', dateStr));
-      const querySnapshot = await getDocs(q);
-      
-      for (const docSnapshot of querySnapshot.docs) {
-        await deleteDoc(docSnapshot.ref);
+    // 1. 先从本地 IndexedDB 删除
+    await deleteLocalEntry(dateStr);
+    console.log('已从本地删除');
+    
+    // 2. 从内存中删除
+    delete entries[dateStr];
+    
+    // 3. 如果 Firebase 可用且开启了自动同步，同步删除到云端
+    const autoSync = await getLocalSetting('autoSync', false);
+    if (autoSync && window.firebaseApp && window.firebaseApp.db) {
+      try {
+        await waitForFirebase();
+        const { db, collection, query, where, getDocs, doc, deleteDoc } = window.firebaseApp;
+        const uid = getCurrentUid();
+        const q = query(collection(db, 'entries'), where('uid', '==', uid), where('date', '==', dateStr));
+        const querySnapshot = await getDocs(q);
+        
+        for (const docSnapshot of querySnapshot.docs) {
+          await deleteDoc(docSnapshot.ref);
+        }
+        console.log('已从云端删除');
+      } catch (syncErr) {
+        console.error('云端删除失败:', syncErr);
+        // 记录删除操作待同步
+        await saveLocalEntry({ date: dateStr, _deleted: true, updatedAt: Date.now() });
       }
     }
-    
-    // 从本地数据中删除
-    delete entries[dateStr];
     
     // 返回首页并刷新
     goBack();
@@ -2357,27 +2717,35 @@ function editCurrentEntry() {
   if (window._detailDateStr) openNew(window._detailDateStr);
 }
 
-// 删除指定日期的日记
+// 删除指定日期的日记（年度视图使用）
 async function deleteEntry(dateStr) {
   showToast('正在删除...');
   
   try {
-    await waitForFirebase();
-    // 从 Firebase 删除
-    if (window.firebaseApp && window.firebaseApp.db) {
-      const { db, collection, query, where, getDocs, doc, deleteDoc } = window.firebaseApp;
-      const uid = getCurrentUid();
-      // 按用户和日期删除
-      const q = query(collection(db, 'entries'), where('uid', '==', uid), where('date', '==', dateStr));
-      const querySnapshot = await getDocs(q);
-      
-      for (const docSnapshot of querySnapshot.docs) {
-        await deleteDoc(docSnapshot.ref);
+    // 1. 先从本地 IndexedDB 删除
+    await deleteLocalEntry(dateStr);
+    
+    // 2. 从内存中删除
+    delete entries[dateStr];
+    
+    // 3. 如果 Firebase 可用且开启了自动同步，同步删除到云端
+    const autoSync = await getLocalSetting('autoSync', false);
+    if (autoSync && window.firebaseApp && window.firebaseApp.db) {
+      try {
+        await waitForFirebase();
+        const { db, collection, query, where, getDocs, doc, deleteDoc } = window.firebaseApp;
+        const uid = getCurrentUid();
+        const q = query(collection(db, 'entries'), where('uid', '==', uid), where('date', '==', dateStr));
+        const querySnapshot = await getDocs(q);
+        
+        for (const docSnapshot of querySnapshot.docs) {
+          await deleteDoc(docSnapshot.ref);
+        }
+      } catch (syncErr) {
+        console.error('云端删除失败:', syncErr);
+        await saveLocalEntry({ date: dateStr, _deleted: true, updatedAt: Date.now() });
       }
     }
-    
-    // 从本地数据中删除
-    delete entries[dateStr];
     
     // 刷新列表和日历
     renderCalendar();
@@ -4180,13 +4548,15 @@ const authStyles = `
 document.head.insertAdjacentHTML('beforeend', authStyles);
 
 // 从 Firebase 加载真实数据（等 Firebase SDK 初始化完成）
-function initFirebase() {
-  loadEntriesFromFirebase();
+async function initFirebase() {
+  await loadSyncSettings();
+  await loadEntriesFromFirebase();
   initAuth();
 }
 
 // 本地模式初始化（直接使用测试数据，不依赖 Firebase）
-function initLocalMode() {
+async function initLocalMode() {
+  await loadSyncSettings();
   entries = {};
   TEST_DATA.forEach(item => {
     entries[item.date] = {
