@@ -3702,8 +3702,7 @@ let currentAuthMode = 'login';
 
 // 页面导航函数
 function showLoginPage() {
-  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-  document.getElementById('page-auth').style.display = 'flex';
+  goTo('page-auth');
   switchAuthMode('login');
 }
 
@@ -4437,7 +4436,7 @@ const authStyles = `
   min-height: 100vh;
 }
 .auth-header {
-  padding: 16px 0;
+  padding: max(12px, env(safe-area-inset-top)) 20px 12px;
 }
 .auth-back {
   font-size: 32px;
@@ -4447,7 +4446,7 @@ const authStyles = `
   height: 40px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
 }
 .auth-content {
   flex: 1;
