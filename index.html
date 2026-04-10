@@ -920,6 +920,10 @@
         <span class="settings-row-label" style="color:#FF3B30;">清空所有数据</span>
         <div class="settings-row-right"><span class="settings-arrow">›</span></div>
       </div>
+      <div class="settings-row" onclick="deleteTestDataOnly()">
+        <span class="settings-row-label" style="color:#FF9500;">仅删除测试数据</span>
+        <div class="settings-row-right"><span class="settings-arrow">›</span></div>
+      </div>
     </div>
 
     <!-- 退出登录 -->
@@ -4096,6 +4100,61 @@ async function resetTestData() {
     return;
   }
   await initTestData(true); // 强制重置
+}
+
+// 测试数据日期列表
+const TEST_DATA_DATES = [
+  '2026-03-05', '2026-03-08', '2026-03-12', '2026-03-15', '2026-03-18', 
+  '2026-03-20', '2026-03-25', '2026-03-28', '2026-03-30',
+  '2026-04-02', '2026-04-04', '2026-04-05', '2026-04-06', '2026-04-07', '2026-04-08'
+];
+
+// 仅删除测试数据
+async function deleteTestDataOnly() {
+  if (!confirm('确定要删除测试数据吗？这会删除以下日期的日记（如果存在）：\n' + TEST_DATA_DATES.join(', '))) {
+    return;
+  }
+  
+  try {
+    const uid = getCurrentUid();
+    let deletedCount = 0;
+    
+    // 1. 删除本地 IndexedDB 中的测试数据
+    for (const date of TEST_DATA_DATES) {
+      try {
+        await deleteLocalEntry(date);
+        delete entries[date];
+        deletedCount++;
+      } catch (e) {
+        // 可能本地没有这条数据，忽略错误
+      }
+    }
+    
+    // 2. 删除云端 Firebase 中的测试数据
+    try {
+      await waitForFirebase();
+      const { db, doc, deleteDoc } = window.firebaseApp;
+      
+      for (const date of TEST_DATA_DATES) {
+        try {
+          const docRef = doc(db, 'entries', `${uid}_${date}`);
+          await deleteDoc(docRef);
+        } catch (e) {
+          // 可能云端没有这条数据，忽略错误
+        }
+      }
+    } catch (cloudErr) {
+      console.log('云端删除部分失败:', cloudErr.message);
+    }
+    
+    // 3. 刷新首页
+    renderHome();
+    
+    showToast(`已删除 ${deletedCount} 条测试数据`);
+  } catch (error) {
+    console.error('删除测试数据失败:', error);
+    showToast('删除失败，请重试');
+  }
 }
 
 // 清空所有数据
