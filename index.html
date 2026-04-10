@@ -4011,15 +4011,18 @@ async function handleEmailLogin() {
   if (!email || !password) { errorEl.textContent = '请填写所有字段'; return; }
   
   try {
+    console.log('尝试登录:', email);
     const { auth, signInWithEmailAndPassword } = window.firebaseApp;
     await signInWithEmailAndPassword(auth, email, password);
+    console.log('登录成功');
     // 等待 onAuthStateChanged 触发更新 userProfile
     setTimeout(() => {
       showSettingsPage();
       showToast('登录成功');
     }, 100);
   } catch (err) {
-    errorEl.textContent = getErrorMessage(err.code);
+    console.error('登录失败:', err.code, err.message);
+    errorEl.textContent = getErrorMessage(err.code) || '登录失败: ' + err.message;
   }
 }
 
@@ -4086,7 +4089,7 @@ function getErrorMessage(code) {
     'auth/email-already-in-use': '该邮箱已注册',
     'auth/weak-password': '密码强度不足',
     'auth/invalid-email': '邮箱格式不正确',
-    'auth/too-many-requests': '操作过于频繁',
+    'auth/too-many-requests': '操作过于频繁，请稍后再试',
     'auth/invalid-verification-code': '验证码错误',
     'auth/code-expired': '验证码已过期',
     'auth/quota-exceeded': '短信配额已用完',
@@ -4096,9 +4099,16 @@ function getErrorMessage(code) {
     'auth/captcha-check-failed': '验证失败，请重试',
     'auth/invalid-app-credential': '应用验证失败',
     'auth/unauthorized-continue-uri': '未授权的域名',
-    'auth/invalid-verification-id': '验证ID无效'
+    'auth/invalid-verification-id': '验证ID无效',
+    'auth/network-request-failed': '网络请求失败，请检查网络连接',
+    'auth/internal-error': '服务器内部错误，请稍后再试',
+    'auth/popup-closed-by-user': '登录窗口被关闭',
+    'auth/cancelled-popup-request': '登录请求已取消',
+    'auth/invalid-credential': '登录凭证无效，请重新登录',
+    'auth/operation-not-allowed': '登录方式未启用，请联系管理员',
+    'auth/timeout': '请求超时，请稍后再试'
   };
-  return messages[code] || '操作失败';
+  return messages[code] || ('错误: ' + code);
 }
 
 // 错误提示样式
