@@ -32,7 +32,7 @@ self.addEventListener('fetch', (event) => {
   const isStaticFile = STATIC_FILE_EXTENSIONS.some(ext => request.url.endsWith(ext));
   // 页面导航请求（mode=navigate）直接走网络，确保PWA独立模式能正常打开
   if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).catch(() => caches.match('/index.html')));
+    event.respondWith(fetch(request).catch(() => caches.match('./index.html')));
     return;
   }
   if (!isStaticFile) {
