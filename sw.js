@@ -1,5 +1,5 @@
 // Service Worker 修复版：彻底解决POST缓存报错，仅缓存静态资源
-const CACHE_NAME = 'app-static-cache-v1';
+const CACHE_NAME = 'app-static-cache-v2';
 // 仅缓存的静态资源后缀
 const STATIC_FILE_EXTENSIONS = ['.html', '.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff2', '.woff'];
 
@@ -30,6 +30,11 @@ self.addEventListener('fetch', (event) => {
 
   // 关键修复2：只缓存静态资源，跳过所有API/接口请求
   const isStaticFile = STATIC_FILE_EXTENSIONS.some(ext => request.url.endsWith(ext));
+  // 页面导航请求（mode=navigate）直接走网络，确保PWA独立模式能正常打开
+  if (request.mode === 'navigate') {
+    event.respondWith(fetch(request).catch(() => caches.match('/index.html')));
+    return;
+  }
   if (!isStaticFile) {
     return;
   }
