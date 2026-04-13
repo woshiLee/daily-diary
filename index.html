@@ -4702,16 +4702,35 @@ async function initLocalMode() {
 }
 
 // 页面加载时初始化
-if (window.firebaseReady) {
+let firebaseInitialized = false;
+function doInitFirebase() {
+  if (firebaseInitialized) return;
+  firebaseInitialized = true;
   initFirebase();
+}
+if (window.firebaseReady) {
+  doInitFirebase();
 } else {
-  window.onFirebaseReady = initFirebase;
-  // 3秒后如果 Firebase 还没准备好，切换到本地模式
+  window.onFirebaseReady = doInitFirebase;
+  // 8秒后如果 Firebase 还没准备好，先显示本地模式，但继续等待 Firebase
   setTimeout(() => {
     if (!window.firebaseReady) {
+      console.log('Firebase 尚未就绪，先进入本地模式，等待后台重试...');
       initLocalMode();
+      // 继续轮询等待 Firebase 就绪，最多再等 15 秒
+      const retryInterval = setInterval(() => {
+        if (window.firebaseReady) {
+          clearInterval(retryInterval);
+          if (!firebaseInitialized) {
+            console.log('Firebase 后台就绪，切换到云端模式');
+            doInitFirebase();
+          }
+        }
+      }, 1500);
+      // 15秒后放弃重试
+      setTimeout(() => clearInterval(retryInterval), 15000);
     }
-  }, 3000);
+  }, 8000);
 }
 </script>
 </body>
